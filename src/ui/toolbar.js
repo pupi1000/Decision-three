@@ -293,6 +293,12 @@
         btn.classList.toggle('active', !!isCollapsed);
         btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
       }
+      const toggleBtn = document.getElementById('sidebar-toggle-btn');
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        toggleBtn.title = isCollapsed ? 'Expandir panel lateral (Alt+B)' : 'Contraer panel lateral (Alt+B)';
+        toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expandir panel lateral' : 'Contraer panel lateral');
+      }
     },
 
     /**

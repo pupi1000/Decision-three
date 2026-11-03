@@ -144,9 +144,16 @@ header, .titlebar {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* ── BARRA LATERAL COLAPSABLE ── */
+/* ── BARRA LATERAL COLAPSABLE (FEAT-04 / UI REFINEMENT) ── */
+.sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
 .sidebar.collapsed {
-  display: none !important;
+  width: 44px;
 }
 
 /* ── INTEGRACIÓN CON MODO PRESENTACIÓN ── */

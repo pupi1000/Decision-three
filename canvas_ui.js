@@ -97,23 +97,35 @@ function render() {
 }
 
 function updateStats() {
-  const mainVal = utilityMode && tree ? fmt(tree._ce) : (tree ? fmt(tree._ev) : '—');
+  const isCe = (typeof utilityMode !== 'undefined' && utilityMode);
+  const mainVal = (isCe && tree) ? fmt(tree._ce) : (tree ? fmt(tree._ev) : '—');
   const statEv = document.getElementById('stat-ev');
+  const statEvLabel = document.getElementById('stat-ev-label');
   const statDec = document.getElementById('stat-dec');
   const statNodes = document.getElementById('stat-nodes');
   const statLevels = document.getElementById('stat-levels');
   const statMode = document.getElementById('stat-mode');
   const statCe = document.getElementById('stat-ce');
 
-  if (statEv)     statEv.textContent     = tree ? fmt(tree._ev) : '—';
-  if (statDec)    statDec.textContent    = tree ? findOptimalLabel(tree) : '—';
+  if (statEv) {
+    statEv.textContent = (isCe && tree) ? fmt(tree._ce) : (tree ? fmt(tree._ev) : '—');
+    statEv.className = 'stat-value ' + (isCe ? 'stat-ce-val' : 'gold');
+  }
+  if (statEvLabel) {
+    statEvLabel.textContent = isCe ? 'CE óptimo' : 'VE óptimo';
+  }
+  if (statDec) {
+    const optLabel = tree ? findOptimalLabel(tree) : '—';
+    statDec.textContent = optLabel;
+    statDec.title = optLabel;
+  }
   if (statNodes)  statNodes.textContent  = tree ? countNodes(tree) : '0';
   if (statLevels) statLevels.textContent = tree ? countDepth(tree) : '0';
   if (statMode) {
     statMode.textContent = optimizeMode === 'max' ? 'Maximizar ↑' : 'Minimizar ↓';
     statMode.style.color = optimizeMode === 'max' ? 'var(--gold)' : '#ff9f4a';
   }
-  if (statCe)     statCe.textContent     = (utilityMode && tree) ? fmt(tree._ce) : '—';
+  if (statCe)     statCe.textContent     = (isCe && tree) ? fmt(tree._ce) : '—';
   validateProbabilities();
 }
 
@@ -545,24 +557,120 @@ function refreshSelectedPanel() {
   const panel = document.getElementById('selected-info');
   if (!panel) return;
   if (!selectedNode) {
-    panel.textContent = 'Haz clic en un nodo para ver sus propiedades';
+    panel.innerHTML = `
+      <div class="selected-empty-state">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="empty-icon">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="16" x2="12" y2="12"></line>
+          <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+        <p class="empty-text">Selecciona un nodo del árbol para consultar sus características y propiedades.</p>
+      </div>
+    `;
     return;
   }
-  const colors = {decision:'#4f8ef7', chance:'#3BA2A4', terminal:'#9b7ff4'};
-  const types  = {decision:'Decisión', chance:'Azar / Evento', terminal:'Terminal'};
+
   const n = selectedNode;
+  const isCe = (typeof utilityMode !== 'undefined' && utilityMode);
+  const typeMap = {
+    decision: { label: 'Decisión', pillClass: 'type-dec' },
+    chance:   { label: 'Azar / Evento', pillClass: 'type-cha' },
+    terminal: { label: 'Terminal', pillClass: 'type-ter' }
+  };
+  const typeInfo = typeMap[n.type] || { label: n.type, pillClass: 'type-dec' };
+
+  let propsHtml = '';
+  // ID
+  propsHtml += `
+    <div class="node-prop-item">
+      <span class="node-prop-label">ID:</span>
+      <span class="node-prop-val">${n.id}</span>
+    </div>
+  `;
+  // Tipo
+  propsHtml += `
+    <div class="node-prop-item">
+      <span class="node-prop-label">Tipo:</span>
+      <span class="node-prop-val">${typeInfo.label}</span>
+    </div>
+  `;
+
+  // Valor monetario directo (solo terminales o cuando existe valor explícito)
+  if (n.type === 'terminal' || (n.value !== undefined && n.value !== 0)) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">Valor pago:</span>
+        <span class="node-prop-val" style="color:#9b7ff4">${fmt(n.value || 0)}</span>
+      </div>
+    `;
+  }
+
+  // Valor Esperado (VE) para nodos de decisión y azar
+  if (n.type !== 'terminal' && n._ev !== undefined) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">VE calculado:</span>
+        <span class="node-prop-val" style="color:var(--gold)">${fmt(n._ev || 0)}</span>
+      </div>
+    `;
+  }
+
+  // Equivalente Cierto (CE) si el modo de utilidad está activo
+  if (isCe && n._ce !== undefined) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">Equivalente (CE):</span>
+        <span class="node-prop-val" style="color:#c97ef7">${fmt(n._ce)}</span>
+      </div>
+    `;
+  }
+
+  // Probabilidad si aplica
+  if (n.prob != null) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">Probabilidad:</span>
+        <span class="node-prop-val" style="color:#3BA2A4">${(n.prob * 100).toFixed(1)}% (${n.prob})</span>
+      </div>
+    `;
+  }
+
+  // Cantidad de hijos / ramas conectadas
+  if (n.children && n.children.length > 0) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">Ramas / Hijos:</span>
+        <span class="node-prop-val">${n.children.length}</span>
+      </div>
+    `;
+  }
+
+  // Estado óptimo
+  if (n._optimal === true) {
+    propsHtml += `
+      <div class="node-prop-item">
+        <span class="node-prop-label">Estado:</span>
+        <span class="node-prop-val" style="color:var(--gold)">★ Rama óptima</span>
+      </div>
+    `;
+  }
+
   panel.innerHTML = `
-    <div style="color:${colors[n.type]};font-weight:700;margin-bottom:6px">${n.label}</div>
-    <div style="color:var(--muted)">ID: <span style="color:var(--text);font-family:'DM Mono',monospace">${n.id}</span></div>
-    <div style="color:var(--muted)">Tipo: <span style="color:var(--text)">${types[n.type]}</span></div>
-    <div style="color:var(--muted)">Valor: <span style="color:var(--text);font-family:'DM Mono',monospace">${fmt(n.value||0)}</span></div>
-    <div style="color:var(--muted)">VE: <span style="color:${colors[n.type]};font-family:'DM Mono',monospace">${fmt(n._ev||0)}</span></div>
-    ${n.prob!=null?`<div style="color:var(--muted)">Prob: <span style="color:var(--text);font-family:'DM Mono',monospace">${(n.prob*100).toFixed(0)}%</span></div>`:''}
-    ${n.children&&n.children.length?`<div style="color:var(--muted)">Hijos: <span style="color:var(--text)">${n.children.length}</span></div>`:''}
-    <div style="margin-top:10px;font-size:10px;color:var(--muted)">Clic derecho sobre el nodo para ver todas las opciones</div>
-    <div style="margin-top:6px;display:flex;gap:6px">
-      <button class="tool-btn" style="padding:5px 8px;font-size:10px;flex:1" onclick="ctxEditNode()">✏️ Editar</button>
-      <button class="tool-btn" style="padding:5px 8px;font-size:10px;flex:1;color:var(--danger);border-color:var(--danger)" onclick="deleteSelected()">🗑️ Eliminar</button>
+    <div class="node-card">
+      <div class="node-card-header">
+        <div class="node-card-title" title="${n.label}">${n.label}</div>
+        <span class="node-type-pill ${typeInfo.pillClass}">${typeInfo.label}</span>
+      </div>
+      <div class="node-props-grid">
+        ${propsHtml}
+      </div>
+      <div style="font-size:9.5px;color:#7d8c9e;margin-top:2px;line-height:1.4">
+        Clic derecho sobre el nodo para opciones completas.
+      </div>
+      <div class="node-card-actions">
+        <button class="sidebar-action-btn" onclick="ctxEditNode()" title="Editar propiedades del nodo">✏️ Editar</button>
+        <button class="sidebar-action-btn danger" onclick="deleteSelected()" title="Eliminar nodo seleccionado">🗑️ Eliminar</button>
+      </div>
     </div>
   `;
 }
@@ -1048,6 +1156,44 @@ function runSensitivity() {
 //  MODO PRESENTACIÓN
 // ═══════════════════════════════════════════════
 let presentationMode = false;
+
+/**
+ * Alterna el estado colapsado / expandido de la barra lateral (FEAT-04 / UI REFINEMENT)
+ */
+function toggleSidebar() {
+  const sidebar = document.querySelector('.sidebar');
+  if (!sidebar) return;
+  sidebar.classList.toggle('collapsed');
+  const isCollapsed = sidebar.classList.contains('collapsed');
+
+  const toggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    toggleBtn.title = isCollapsed ? 'Expandir panel lateral (Alt+B)' : 'Contraer panel lateral (Alt+B)';
+    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expandir panel lateral' : 'Contraer panel lateral');
+  }
+
+  // Sincronización bidireccional con el botón en Ribbon Vista
+  if (typeof DecisionTreeUI !== 'undefined' && DecisionTreeUI.Toolbar && typeof DecisionTreeUI.Toolbar.syncSidebar === 'function') {
+    DecisionTreeUI.Toolbar.syncSidebar(isCollapsed);
+  } else {
+    const btn = document.querySelector('button[data-action="toggle-sidebar"]');
+    if (btn) {
+      btn.classList.toggle('active', isCollapsed);
+      btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
+    }
+  }
+
+  if (typeof setStatus === 'function') {
+    setStatus(isCollapsed ? 'Barra lateral contraída — área de trabajo maximizada' : 'Barra lateral expandida');
+  }
+
+  // Ajuste suave del canvas al ancho liberado
+  setTimeout(() => {
+    if (typeof fitToScreen === 'function') fitToScreen();
+  }, 120);
+}
+if (typeof window !== 'undefined') window.toggleSidebar = toggleSidebar;
 
 function togglePresentation() {
   presentationMode = !presentationMode;
@@ -1557,6 +1703,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomIn(); }
   if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
   if (e.key === '0') { e.preventDefault(); fitToScreen(); }
+  if (e.altKey && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); toggleSidebar(); }
   const PS = 30;
   if (e.key === 'ArrowLeft')  { vp.x += PS; applyViewport(); }
   if (e.key === 'ArrowRight') { vp.x -= PS; applyViewport(); }
