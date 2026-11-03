@@ -6,32 +6,34 @@
 <title>DecisionTree Pro — AIGENOTECH</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/ribbon.css">
+<link rel="stylesheet" href="styles/toolbar.css">
+<link rel="stylesheet" href="styles/modals.css">
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="logo">AIGENOTECH <span class="brand-dot"></span> DecisionTree Pro</div>
-  <div class="version-badge">v5.0.0</div>
-  <div class="header-sep"></div>
-  <button class="header-btn" onclick="loadExample('launch')">Ej: Lanzamiento</button>
-  <button class="header-btn" onclick="loadExample('invest')">Ej: Inversión</button>
-  <button class="header-btn" onclick="loadExample('bayes')">Ej: Bayesiano</button>
-  <button class="header-btn" id="btn-undo" onclick="undo()" title="Deshacer (Ctrl+Z)" disabled>↩ Deshacer</button>
-  <button class="header-btn" id="btn-redo" onclick="redo()" title="Rehacer (Ctrl+Y)" disabled>↪ Rehacer</button>
-  <button class="header-btn" id="btn-minmax" onclick="toggleMinMax()" title="Alternar Maximizar/Minimizar">↑ Maximizar</button>
-  <button class="header-btn" id="btn-utility" onclick="toggleUtilityMode()" title="Activar modo Utilidad de Riesgo (CE)">◎ VE</button>
-  <button class="header-btn" onclick="openSensitivity()" title="Análisis de sensibilidad">∂ Sensibilidad</button>
-  <button class="header-btn" onclick="openBayes()" title="Calculadora Bayesiana">𝑃 Bayes</button>
-  <button class="header-btn" onclick="togglePresentation()" id="btn-present" title="Modo presentación">⛶ Presentar</button>
-  <button class="header-btn" onclick="fitToScreen()" title="Ajustar al área visible">⊞ Ajustar</button>
-  <button class="header-btn" onclick="saveJSON()" title="Guardar árbol como archivo JSON">💾 Guardar</button>
-  <button class="header-btn" onclick="document.getElementById('inp-load').click()" title="Cargar árbol desde archivo JSON">📂 Cargar</button>
-  <input type="file" id="inp-load" accept=".json" style="display:none" onchange="loadJSON(event)">
-  <button class="header-btn" onclick="clearTree()">Limpiar</button>
-  <button class="header-btn" onclick="exportPNG()" title="Exportar como imagen PNG">⬇ PNG</button>
-  <button class="header-btn primary" onclick="exportSVG()">⬇ SVG</button>
+<!-- HEADER / TITLE BAR -->
+<header class="titlebar">
+  <div class="titlebar-left">
+    <div class="logo">AIGENOTECH <span class="brand-dot"></span> DecisionTree Pro</div>
+    <div class="version-badge">v5.0.0</div>
+  </div>
+  <div class="titlebar-center">
+    <div class="titlebar-doc" id="ribbon-doc-title">Lanzamiento de Producto</div>
+  </div>
+  <div class="titlebar-right">
+    <span class="titlebar-badge badge-mode max" id="titlebar-mode">MAX</span>
+    <span class="titlebar-badge badge-nodes" id="titlebar-nodes">0 nodos</span>
+  </div>
 </header>
+
+<!-- PUNTO DE MONTAJE: BARRA DE HERRAMIENTAS RIBBON (FEAT-04) -->
+<nav class="ribbon-bar" id="ribbon-bar" role="navigation" aria-label="Barra de herramientas Ribbon"></nav>
+
+<!-- Controles de compatibilidad para entrada de archivos y automatización -->
+<input type="file" id="inp-load" accept=".json" style="display:none" onchange="loadJSON(event)">
+<button id="btn-minmax" style="display:none" onclick="toggleMinMax()"></button>
 
 <!-- WORKSPACE -->
 <div class="workspace">
@@ -427,7 +429,87 @@
   </div>
 </div>
 
+<!-- MODAL VALOR DE INFORMACIÓN (VEIP / VEIM - ROADMAP v5.1) -->
+<div class="modal-overlay" id="modal-value-info">
+  <div class="modal modal-wide">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Valor de la Información — Teoría de Decisiones</span>
+      <button class="sens-close" onclick="closeValueInfoModal()">✕</button>
+    </div>
+    
+    <div class="value-info-tabs">
+      <button class="value-info-tab active" id="tab-btn-veip" onclick="switchValueInfoTab('veip')">
+        VEIP (Información Perfecta)
+      </button>
+      <button class="value-info-tab" id="tab-btn-veim" onclick="switchValueInfoTab('veim')">
+        VEIM (Información Muestral)
+      </button>
+    </div>
+
+    <!-- Contenido VEIP -->
+    <div class="value-info-content active" id="content-veip">
+      <div class="value-info-badge">Roadmap v5.1 — En Desarrollo</div>
+      <h3 class="value-info-heading">Valor Esperado de la Información Perfecta (VEIP)</h3>
+      <p class="value-info-desc">
+        Representa la ganancia adicional esperada si el tomador de decisiones supiera de antemano y con certeza matemática absoluta cuál estado de la naturaleza ocurrirá antes de seleccionar la alternativa.
+      </p>
+      <div class="value-info-formula-card">
+        <div class="formula-label">FÓRMULA MATEMÁTICA:</div>
+        <div class="formula-math">VEIP = | VE con Información Perfecta − VE sin Información Perfecta |</div>
+        <div class="formula-sub">
+          <strong>VE<sub>con IP</sub></strong> = ∑ P(s<sub>j</sub>) · óptimo<sub>i</sub> [R<sub>ij</sub>]<br>
+          <strong>VE<sub>sin IP</sub></strong> = óptimo<sub>i</sub> [ ∑ P(s<sub>j</sub>) · R<sub>ij</sub> ] (Valor base del árbol actual)
+        </div>
+      </div>
+      <div class="value-info-note">
+        <strong>Interpretación gerencial:</strong> El VEIP fija el <em>límite presupuestario superior</em> para cualquier estudio o adquisición de datos. Ninguna organización racional debería pagar más que el VEIP por una investigación previa.
+      </div>
+      <div class="value-info-status">
+        <strong>Estado en DecisionTree Pro:</strong> En la versión 5.1, el motor recalculará dinámicamente el árbol invertido (nodos de azar previos a las decisiones) para generar el VEIP de forma automatizada sobre la estructura cargada.
+      </div>
+    </div>
+
+    <!-- Contenido VEIM -->
+    <div class="value-info-content" id="content-veim">
+      <div class="value-info-badge">Roadmap v5.1 — En Desarrollo</div>
+      <h3 class="value-info-heading">Valor Esperado de la Información Muestral (VEIM)</h3>
+      <p class="value-info-desc">
+        Mide el beneficio económico esperado que aporta un experimento, sondeo, auditoría o prueba piloto imperfecta cuyas verosimilitudes se actualizan mediante el Teorema de Bayes.
+      </p>
+      <div class="value-info-formula-card">
+        <div class="formula-label">FÓRMULA MATEMÁTICA:</div>
+        <div class="formula-math">VEIM = VE con Información Muestral − VE sin Información</div>
+        <div class="formula-sub">
+          <strong>VNIM (Valor Neto)</strong> = VEIM − Costo del Muestreo<br>
+          <strong>Eficiencia de la Información (E)</strong> = ( VEIM / VEIP ) × 100%
+        </div>
+      </div>
+      <div class="value-info-note">
+        <strong>Criterio de decisión:</strong> Si el <strong>VNIM &gt; 0</strong>, es económicamente aconsejable encargar el estudio previo o prueba piloto; si el VNIM ≤ 0, la recomendación óptima es proceder directamente sin incurrir en costos de muestreo.
+      </div>
+      <div class="value-info-status">
+        <strong>Estado en DecisionTree Pro:</strong> La versión 5.1 vinculará la actual <em>Calculadora Bayesiana</em> con la inserción automática de ramas de muestreo en el lienzo para calcular VEIM y eficiencia en un solo clic.
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="modal-btn" onclick="openBayes(); closeValueInfoModal();">Abrir Calculadora Bayesiana</button>
+      <button class="modal-btn confirm" onclick="closeValueInfoModal()">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOTOR Y CANVAS EXISTENTES (PRESERVADOS INTACTOS) -->
 <script src="tree_engine.js"></script>
 <script src="canvas_ui.js"></script>
+
+<!-- CAPA MODULAR DE INTERFAZ DE USUARIO (FEAT-04) -->
+<script src="src/ui/components/buttons.js"></script>
+<script src="src/ui/components/tooltips.js"></script>
+<script src="src/ui/tabs.js"></script>
+<script src="src/ui/toolbar.js"></script>
+<script src="src/ui/ui-events.js"></script>
+<script src="src/ui/ribbon.js"></script>
+<script src="src/ui/ui.js"></script>
 </body>
 </html>

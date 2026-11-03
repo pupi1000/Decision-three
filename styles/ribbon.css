@@ -1,0 +1,83 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STYLES: RIBBON CONTAINER & TABS (FEAT-04)
+   Responsabilidad: Contenedor Ribbon, pestañas horizontales y paneles de vista.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ribbon-bar {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 40;
+}
+
+/* ── PESTAÑAS HORIZONTALES (TABS) ── */
+.ribbon-tabs {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: rgba(13, 17, 24, 0.6);
+  border-bottom: 1px solid var(--border);
+  gap: 2px;
+}
+
+.ribbon-tab {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--muted);
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 15px;
+  cursor: pointer;
+  position: relative;
+  transition: all .15s ease;
+  letter-spacing: 0.03em;
+  user-select: none;
+  border-radius: 4px 4px 0 0;
+}
+
+.ribbon-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ribbon-tab.active {
+  color: var(--brand);
+  background: rgba(59, 162, 164, 0.08);
+}
+
+.ribbon-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand);
+}
+
+/* ── PANELES DE CONTENIDO (RIBBON CONTENT) ── */
+.ribbon-content {
+  height: 74px;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.ribbon-panel {
+  display: none;
+  height: 100%;
+  padding: 4px 16px;
+  align-items: stretch;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.ribbon-panel.active {
+  display: flex;
+}

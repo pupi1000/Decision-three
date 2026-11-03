@@ -1,0 +1,104 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STYLES: LAYOUT & TITLEBAR (FEAT-04)
+   Responsabilidad: Estructura general, barra de título y modos de presentación.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── BARRA DE TÍTULO SUPERIOR (TITLEBAR) ── */
+header, .titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 38px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  border-top: 2px solid var(--brand);
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 50;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titlebar-doc {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface2);
+  padding: 3px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  letter-spacing: 0.03em;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titlebar-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.badge-mode.max {
+  background: rgba(245, 200, 66, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(245, 200, 66, 0.3);
+}
+
+.badge-mode.min {
+  background: rgba(255, 143, 90, 0.15);
+  color: #ff8f5a;
+  border: 1px solid rgba(255, 143, 90, 0.3);
+}
+
+.badge-nodes {
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* ── BARRA LATERAL COLAPSABLE ── */
+.sidebar.collapsed {
+  display: none !important;
+}
+
+/* ── INTEGRACIÓN CON MODO PRESENTACIÓN ── */
+body.presentation-mode header,
+body.presentation-mode .ribbon-bar,
+body.presentation-mode .sidebar,
+body.presentation-mode .bottom-bar,
+body.presentation-mode .zoom-controls,
+body.presentation-mode .minimap,
+body.presentation-mode .sensitivity-panel,
+body.presentation-mode .modal-overlay {
+  display: none !important;
+}
+
+body.presentation-mode .workspace {
+  height: 100vh;
+}
+
+body.presentation-mode .canvas-area {
+  flex: 1;
+  height: 100vh;
+}

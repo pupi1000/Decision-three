@@ -1,0 +1,138 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STYLES: MODALS & VALUE INFO (FEAT-04)
+   Responsabilidad: Estilos de modales enriquecidos, pestañas de información
+   y fichas teórico-metodológicas de VEIP y VEIM (Roadmap v5.1).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Modal amplio para documentación metodológica */
+.modal-wide {
+  max-width: 600px;
+  width: 92%;
+}
+
+/* Pestañas internas del modal */
+.value-info-tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border);
+  margin: 12px 0 16px 0;
+}
+
+.value-info-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: 'Syne', sans-serif;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.value-info-tab:hover {
+  color: var(--text);
+}
+
+.value-info-tab.active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+
+/* Contenido condicional de pestañas */
+.value-info-content {
+  display: none;
+}
+
+.value-info-content.active {
+  display: block;
+  animation: fadeInModal .15s ease-out;
+}
+
+@keyframes fadeInModal {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Elementos tipográficos y badges informativos */
+.value-info-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(245, 200, 66, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(245, 200, 66, 0.3);
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+}
+
+.value-info-heading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.value-info-desc {
+  font-size: 11.5px;
+  color: var(--text);
+  line-height: 1.6;
+  margin-bottom: 12px;
+}
+
+/* Tarjeta de formulación matemática */
+.value-info-formula-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.formula-label {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.formula-math {
+  font-family: 'DM Mono', monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.formula-sub {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Notas gerenciales y estado técnico */
+.value-info-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text);
+  background: rgba(79, 142, 247, 0.08);
+  border-left: 3px solid #4f8ef7;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 0 4px 4px 0;
+}
+
+.value-info-status {
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: rgba(59, 162, 164, 0.08);
+  border-left: 3px solid var(--brand);
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+}

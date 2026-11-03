@@ -29,18 +29,13 @@ body {
   overflow: hidden;
 }
 
-/* ── HEADER ── */
-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 0 20px;
-  height: 48px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  border-top: 2px solid var(--brand);
-  flex-shrink: 0;
-}
+/* ═══════════════════════════════════════════════════════════════════════════
+   ESTILOS MODULARES DE INTERFAZ (FEAT-04)
+   ═══════════════════════════════════════════════════════════════════════════ */
+@import url('styles/layout.css');
+@import url('styles/ribbon.css');
+@import url('styles/toolbar.css');
+@import url('styles/modals.css');
 
 .logo {
   font-size: 13px;
@@ -387,6 +382,7 @@ header {
 
 /* ── MODO PRESENTACIÓN ── */
 body.presentation-mode header,
+body.presentation-mode .ribbon-bar,
 body.presentation-mode .sidebar,
 body.presentation-mode .bottom-bar,
 body.presentation-mode .zoom-controls,
