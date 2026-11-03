@@ -1049,37 +1049,52 @@ function runSensitivity() {
 // ═══════════════════════════════════════════════
 let presentationMode = false;
 
-function togglePresentation() {
-  presentationMode = !presentationMode;
-  document.body.classList.toggle('presentation-mode', presentationMode);
-  
-  const btn = document.getElementById('btn-present');
-  if (btn) {
-    btn.classList.toggle('active', presentationMode);
-    btn.setAttribute('aria-pressed', presentationMode ? 'true' : 'false');
-  }
-
-  if (typeof window !== 'undefined' && window.DecisionTreeUI?.Toolbar?.syncPresentation) {
-    window.DecisionTreeUI.Toolbar.syncPresentation(presentationMode);
-  }
-
-  // Sincronización robusta: esperar a que el navegador complete el reflow del layout
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      fitToScreen();
-    }, 80);
-  });
-
-  if (presentationMode) {
-    setStatus('Modo presentación — Esc para salir');
-  } else {
-    setStatus('Modo presentación desactivado');
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  EXPORTACIÓN (PNG Y SVG)
-// ═══════════════════════════════════════════════
+function togglePresentation() {
+  presentationMode = !presentationMode;
+  document.body.classList.toggle('presentation-mode', presentationMode);
+  
+  const btn = document.getElementById('btn-present');
+  if (btn) {
+    btn.classList.toggle('active', presentationMode);
+    btn.setAttribute('aria-pressed', presentationMode ? 'true' : 'false');
+  }
+
+  if (typeof window !== 'undefined' && window.DecisionTreeUI?.Toolbar?.syncPresentation) {
+    window.DecisionTreeUI.Toolbar.syncPresentation(presentationMode);
+  }
+
+  // Sincronización robusta: esperar a que el navegador complete el reflow del layout
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      fitToScreen();
+    }, 80);
+  });
+
+  if (presentationMode) {
+    setStatus('Modo presentación — Esc para salir');
+  } else {
+    setStatus('Modo presentación desactivado');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  EXPORTACIÓN (PNG Y SVG)
+// ═══════════════════════════════════════════════
+/**
+ * Genera el nombre estandarizado y dinámico para exportaciones (DEF-EXP-02)
+ * Formato: DTP_{nombre_arbol}_{YYYY-MM-DD}{ext}
+ */
+function getExportFilename(baseTree, ext) {
+  const rawLabel = (baseTree && baseTree.label ? String(baseTree.label) : 'arbol').trim();
+  const normalized = typeof rawLabel.normalize === 'function'
+    ? rawLabel.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    : rawLabel;
+  const clean = normalized.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').toLowerCase() || 'arbol';
+  const dateStr = new Date().toISOString().slice(0, 10);
+  return `DTP_${clean}_${dateStr}${ext}`;
+}
+if (typeof window !== 'undefined') window.getExportFilename = getExportFilename;
+
 function exportPNG() {
   if (!tree || !lastPosMap) { setStatus('⚠ No hay árbol para exportar'); return; }
 
@@ -1102,13 +1117,16 @@ function exportPNG() {
   const EX = {
     bg:'#0d1118', surface:'#1c2232', border:'#263040', text:'#e8eaf0',
     muted:'#7a8899', gold:'#f5c842', dec:'#4f8ef7', cha:'#3BA2A4',
-    ter:'#9b7ff4', conn:'#3a4258', connOpt:'#f5c842', val:'#e8916a',
+    ter:'#9b7ff4', ce:'#c97ef7', conn:'#3a4258', connOpt:'#f5c842', val:'#e8916a',
   };
 
   lines.push(`<rect width="${W}" height="${H}" fill="${EX.bg}"/>`);
   lines.push(`<text x="${W-12}" y="${H-10}" text-anchor="end" font-size="9" font-weight="600" fill="${EX.muted}" opacity="0.6" font-family="Arial,sans-serif" letter-spacing="0.08em">AIGENOTECH · DecisionTree Pro</text>`);
   lines.push(`<g transform="translate(${pad},${pad})">`);
   calcEV(tree);
+  if (typeof utilityMode !== 'undefined' && utilityMode && typeof calcCE === 'function') {
+    calcCE(tree);
+  }
   renderConnectorsEx(lines, tree, EX);
   renderNodesEx(lines, tree, EX);
   lines.push(`</g></svg>`);
@@ -1119,23 +1137,40 @@ function exportPNG() {
 
   const img = new Image();
   img.onload = () => {
-    const canvas  = document.createElement('canvas');
-    canvas.width  = W * SCALE;
-    canvas.height = H * SCALE;
-    const ctx = canvas.getContext('2d');
-    ctx.scale(SCALE, SCALE);
-    ctx.drawImage(img, 0, 0);
-    URL.revokeObjectURL(url);
-    canvas.toBlob(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      const name = (tree.label || 'arbol').replace(/[^a-z0-9]/gi,'_').toLowerCase();
-      a.download = `DTP_${name}_${new Date().toISOString().slice(0,10)}@2x.png`;
-      a.click();
-      setStatus('✓ PNG exportado en resolución 2x');
-    }, 'image/png');
+    try {
+      const canvas  = document.createElement('canvas');
+      canvas.width  = W * SCALE;
+      canvas.height = H * SCALE;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(SCALE, SCALE);
+      ctx.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => {
+        if (!blob) {
+          setStatus('⚠ Error al generar imagen PNG');
+          return;
+        }
+        const a = document.createElement('a');
+        const dlUrl = URL.createObjectURL(blob);
+        a.href = dlUrl;
+        a.download = getExportFilename(tree, '@2x.png');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => {
+          try { URL.revokeObjectURL(dlUrl); } catch(e) {}
+        }, 1000);
+        setStatus('✓ PNG exportado en resolución 2x');
+      }, 'image/png');
+    } catch(err) {
+      try { URL.revokeObjectURL(url); } catch(e) {}
+      setStatus('⚠ Error al renderizar PNG');
+    }
   };
-  img.onerror = () => setStatus('⚠ Error al generar PNG — intenta con SVG');
+  img.onerror = () => {
+    try { URL.revokeObjectURL(url); } catch(e) {}
+    setStatus('⚠ Error al generar PNG — intenta con SVG');
+  };
   img.src = url;
 }
 
@@ -1156,6 +1191,7 @@ function exportSVG() {
     dec:     '#4f8ef7',
     cha:     '#3BA2A4',
     ter:     '#9b7ff4',
+    ce:      '#c97ef7',
     danger:  '#ff5f5f',
     conn:    '#3a4258',
     connOpt: '#f5c842',
@@ -1163,6 +1199,9 @@ function exportSVG() {
   };
 
   calcEV(tree);
+  if (typeof utilityMode !== 'undefined' && utilityMode && typeof calcCE === 'function') {
+    calcCE(tree);
+  }
 
   const lines = [];
   lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
@@ -1191,9 +1230,15 @@ function exportSVG() {
   const svgStr = lines.join('\n');
   const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'DecisionTree_AIGENOTECH.svg';
+  const dlUrl = URL.createObjectURL(blob);
+  a.href = dlUrl;
+  a.download = getExportFilename(tree, '.svg');
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
+  setTimeout(() => {
+    try { URL.revokeObjectURL(dlUrl); } catch(e) {}
+  }, 1000);
   setStatus('✓ SVG exportado con tema oscuro');
 }
 
@@ -1267,8 +1312,26 @@ function renderNodesEx(lines, node, EX) {
   const shortLabel = node.label.length > 14 ? node.label.substring(0, 13) + '…' : node.label;
   lines.push(`  <text x="${textX}" y="${y + NH/2 - 5}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="600" fill="${EX.text}" font-family="'Syne',Arial,sans-serif">${escXml(shortLabel)}</text>`);
 
-  const evTxt  = node.type === 'terminal' ? fmt(node.value) : `VE: ${fmt(node._ev)}`;
-  const evFill = node.type === 'terminal' ? EX.ter : node.type === 'chance' ? EX.cha : EX.dec;
+  // DEF-EXP-01: Identificación rigurosa del modo analítico VE vs CE
+  const isCeMode = (typeof utilityMode !== 'undefined' && utilityMode);
+  let evTxt;
+  let evFill;
+
+  if (node.type === 'terminal') {
+    evTxt = fmt(node.value);
+    evFill = EX.ter;
+  } else if (isCeMode) {
+    if (node._ce !== undefined && node._ce !== null) {
+      evTxt = `CE: ${fmt(node._ce)}`;
+      evFill = EX.ce || '#c97ef7';
+    } else {
+      evTxt = 'CE: —';
+      evFill = EX.ce || '#c97ef7';
+    }
+  } else {
+    evTxt = `VE: ${fmt(node._ev)}`;
+    evFill = node.type === 'chance' ? EX.cha : EX.dec;
+  }
   lines.push(`  <text x="${textX}" y="${y + NH/2 + 9}" text-anchor="middle" dominant-baseline="central" font-size="9.5" font-weight="500" fill="${evFill}" class="mono" font-family="'DM Mono','Courier New',monospace">${escXml(evTxt)}</text>`);
 
   for (const child of (node.children || [])) renderNodesEx(lines, child, EX);

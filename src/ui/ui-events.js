@@ -303,70 +303,70 @@
       }
     },
 
-    /**
-     * Alternar visibilidad de la barra lateral (DEF-VIS-02)
-     */
-    handleToggleSidebar: function() {
-      const sidebar = document.querySelector('.sidebar');
-      if (sidebar) {
-        sidebar.classList.toggle('collapsed');
-        const isCollapsed = sidebar.classList.contains('collapsed');
-
-        // Sincronización visual y semántica del botón en Ribbon
-        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncSidebar === 'function') {
-          global.DecisionTreeUI.Toolbar.syncSidebar(isCollapsed);
-        } else {
-          const btn = document.querySelector('button[data-action="toggle-sidebar"]');
-          if (btn) {
-            btn.classList.toggle('active', isCollapsed);
-            btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
-          }
-        }
-
-        if (typeof global.setStatus === 'function') {
-          global.setStatus(isCollapsed ? 'Barra lateral oculta — mayor espacio de trabajo' : 'Barra lateral visible');
-        }
-
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (typeof global.fitToScreen === 'function') global.fitToScreen();
-          }, 80);
-        });
-      }
-    },
-
-    /**
-     * Alternar visibilidad del minimapa (DEF-VIS-03)
-     */
-    handleToggleMinimap: function() {
-      const mm = document.getElementById('minimap-container');
-      if (mm) {
-        // Determinar visibilidad real sin depender únicamente de estilos inline
-        const isHidden = mm.style.display === 'none';
-        const willBeVisible = isHidden;
-        mm.style.display = willBeVisible ? 'block' : 'none';
-
-        // Sincronización visual y semántica del botón en Ribbon
-        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncMinimap === 'function') {
-          global.DecisionTreeUI.Toolbar.syncMinimap(willBeVisible);
-        } else {
-          const btn = document.querySelector('button[data-action="toggle-minimap"]');
-          if (btn) {
-            btn.classList.toggle('active', willBeVisible);
-            btn.setAttribute('aria-pressed', willBeVisible ? 'true' : 'false');
-          }
-        }
-
-        if (typeof global.setStatus === 'function') {
-          global.setStatus(willBeVisible ? 'Minimapa visible' : 'Minimapa oculto');
-        }
-
-        if (willBeVisible && typeof global.updateMinimap === 'function') {
-          global.updateMinimap();
-        }
-      }
-    },
-
+    /**
+     * Alternar visibilidad de la barra lateral (DEF-VIS-02)
+     */
+    handleToggleSidebar: function() {
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+
+        // Sincronización visual y semántica del botón en Ribbon
+        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncSidebar === 'function') {
+          global.DecisionTreeUI.Toolbar.syncSidebar(isCollapsed);
+        } else {
+          const btn = document.querySelector('button[data-action="toggle-sidebar"]');
+          if (btn) {
+            btn.classList.toggle('active', isCollapsed);
+            btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
+          }
+        }
+
+        if (typeof global.setStatus === 'function') {
+          global.setStatus(isCollapsed ? 'Barra lateral oculta — mayor espacio de trabajo' : 'Barra lateral visible');
+        }
+
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (typeof global.fitToScreen === 'function') global.fitToScreen();
+          }, 80);
+        });
+      }
+    },
+
+    /**
+     * Alternar visibilidad del minimapa (DEF-VIS-03)
+     */
+    handleToggleMinimap: function() {
+      const mm = document.getElementById('minimap-container');
+      if (mm) {
+        // Determinar visibilidad real sin depender únicamente de estilos inline
+        const isHidden = mm.style.display === 'none';
+        const willBeVisible = isHidden;
+        mm.style.display = willBeVisible ? 'block' : 'none';
+
+        // Sincronización visual y semántica del botón en Ribbon
+        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncMinimap === 'function') {
+          global.DecisionTreeUI.Toolbar.syncMinimap(willBeVisible);
+        } else {
+          const btn = document.querySelector('button[data-action="toggle-minimap"]');
+          if (btn) {
+            btn.classList.toggle('active', willBeVisible);
+            btn.setAttribute('aria-pressed', willBeVisible ? 'true' : 'false');
+          }
+        }
+
+        if (typeof global.setStatus === 'function') {
+          global.setStatus(willBeVisible ? 'Minimapa visible' : 'Minimapa oculto');
+        }
+
+        if (willBeVisible && typeof global.updateMinimap === 'function') {
+          global.updateMinimap();
+        }
+      }
+    },
+
     /**
      * Generación y copia del resumen ejecutivo del árbol
      */
@@ -376,7 +376,15 @@
         return;
       }
       const totalNodes = typeof global.countNodes === 'function' ? global.countNodes(global.tree) : 0;
-      const bestEv = (global.tree._ev != null && typeof global.fmt === 'function') ? global.fmt(global.tree._ev) : '—';
+      
+      // DEF-EXP-03: Sincronización del valor óptimo con modo CE vs VE
+      const isCE = !!global.utilityMode;
+      if (isCE && global.tree._ce === undefined && typeof global.calcCE === 'function') {
+        global.calcCE(global.tree);
+      }
+      const optVal = isCE ? global.tree._ce : global.tree._ev;
+      const bestValFormatted = (optVal != null && typeof global.fmt === 'function') ? global.fmt(optVal) : '—';
+
       let bestBranch = '—';
       if (global.tree.children && global.tree.children.length > 0) {
         const optChild = global.tree.children.find(c => c._optimal);
@@ -389,10 +397,10 @@
         `Modelo / Proyecto : ${global.tree.label || 'Árbol de Decisión'}`,
         `Fecha de análisis : ${new Date().toLocaleString()}`,
         `Criterio activo   : ${global.optimizeMode === 'max' ? 'Maximización (Beneficio)' : 'Minimización (Costo)'}`,
-        `Modo de decisión  : ${global.utilityMode ? `Equivalente Cierto (CE) [R=${global.R}]` : 'Valor Esperado (VE)'}`,
+        `Modo de decisión  : ${isCE ? `Equivalente Cierto (CE) [R=${global.R}]` : 'Valor Esperado (VE)'}`,
         `Total de nodos    : ${totalNodes}`,
         `Decisión óptima   : ${bestBranch}`,
-        `Valor óptimo      : ${bestEv}`,
+        `Valor óptimo      : ${bestValFormatted}`,
         `========================================`
       ].join('\n');
 
