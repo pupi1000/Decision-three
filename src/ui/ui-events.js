@@ -12,13 +12,34 @@
 
   global.DecisionTreeUI = global.DecisionTreeUI || {};
 
+  // ── Sincronización léxica bidireccional con estado del motor ──
+  try {
+    if (typeof optimizeMode !== 'undefined') {
+      Object.defineProperty(global, 'optimizeMode', {
+        get: function() { return optimizeMode; },
+        set: function(val) { optimizeMode = val; },
+        configurable: true
+      });
+    }
+    if (typeof tree !== 'undefined') {
+      Object.defineProperty(global, 'tree', {
+        get: function() { return tree; },
+        set: function(val) { tree = val; },
+        configurable: true
+      });
+    }
+  } catch (e) {
+    console.warn('[DecisionTreeUI] optimizeMode / tree accessor:', e);
+  }
+
   global.DecisionTreeUI.Events = {
     /**
-     * Vincula la delegación de eventos al contenedor Ribbon
+     * Vincula la delegación de eventos al contenedor Ribbon (idempotente)
      * @param {HTMLElement} ribbonContainer
      */
     bindAll: function(ribbonContainer) {
-      if (!ribbonContainer) return;
+      if (!ribbonContainer || ribbonContainer._eventsBound) return;
+      ribbonContainer._eventsBound = true;
 
       // Delegación de clics en botones de acción
       ribbonContainer.addEventListener('click', (e) => {
@@ -176,16 +197,11 @@
 
     /**
      * Sincronización del modo de optimización (Max / Min)
+     * Delega a la función explícita e idempotente setOptimizeMode.
      */
     handleSetOptimizeMode: function(targetMode) {
-      if (targetMode !== 'max' && targetMode !== 'min') return;
-      if (global.optimizeMode !== targetMode) {
-        if (typeof global.toggleMinMax === 'function') {
-          global.toggleMinMax();
-        }
-      }
-      if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
-        global.DecisionTreeUI.Toolbar.syncOptimizeMode(targetMode);
+      if (typeof global.setOptimizeMode === 'function') {
+        global.setOptimizeMode(targetMode);
       }
     },
 
@@ -333,6 +349,101 @@
       if (contentVeim) contentVeim.classList.toggle('active', isVeim);
     }
   };
+
+  /**
+   * ═════════════════════════════════════════════════════════════════════════
+   * GESTIÓN EXPLÍCITA E IDEMPOTENTE DEL CRITERIO DE OPTIMIZACIÓN (MAX / MIN)
+   * ═════════════════════════════════════════════════════════════════════════
+   * Establece explícitamente el modo ('max' | 'min').
+   * - No invierte el modo si se pulsa repetidamente (idempotente).
+   * - Asegura que ambos botones sean mutuamente excluyentes.
+   * - Recalcula inmediatamente el árbol, las ramas óptimas y el panel lateral.
+   * - Sincroniza botones del Ribbon y badge de Titlebar.
+   */
+  global.setOptimizeMode = function(targetMode) {
+    if (targetMode !== 'max' && targetMode !== 'min') return;
+
+    const currentMode = (typeof optimizeMode !== 'undefined') ? optimizeMode : global.optimizeMode;
+
+    // Idempotencia: Si ya está activo el modo solicitado, asegurar sincronía visual y retornar sin recomputar
+    if (currentMode === targetMode) {
+      if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
+        global.DecisionTreeUI.Toolbar.syncOptimizeMode(targetMode);
+      }
+      const tbMode = document.getElementById('titlebar-mode');
+      if (tbMode) {
+        tbMode.textContent = targetMode === 'max' ? 'MAX' : 'MIN';
+        tbMode.className = `titlebar-badge badge-mode ${targetMode}`;
+      }
+      return;
+    }
+
+    // 1. Establecer explícitamente en el motor de cálculo
+    if (typeof optimizeMode !== 'undefined') {
+      optimizeMode = targetMode;
+    }
+    try {
+      global.optimizeMode = targetMode;
+    } catch (e) {}
+
+    // 2. Sincronizar control legado #btn-minmax para retrocompatibilidad total
+    const btnLegacy = document.getElementById('btn-minmax');
+    if (btnLegacy) {
+      btnLegacy.textContent = targetMode === 'min' ? '↓ Minimizar' : '↑ Maximizar';
+      if (targetMode === 'min') {
+        btnLegacy.classList.add('minimizing');
+      } else {
+        btnLegacy.classList.remove('minimizing');
+      }
+    }
+
+    // 3. Notificación accesible de estado
+    if (typeof global.setStatus === 'function') {
+      if (targetMode === 'min') {
+        global.setStatus('Modo Minimizar activado — se selecciona la rama de menor valor esperado');
+      } else {
+        global.setStatus('Modo Maximizar activado — se selecciona la rama de mayor valor esperado');
+      }
+    }
+
+    // 4. Recalcular árbol, ramas óptimas y panel de resultados
+    const activeTree = (typeof tree !== 'undefined') ? tree : global.tree;
+    const renderFn = (typeof render === 'function') ? render : global.render;
+    if (activeTree && typeof renderFn === 'function') {
+      renderFn();
+    }
+
+    // 5. Actualizar botones del Ribbon (mutuamente excluyentes)
+    if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
+      global.DecisionTreeUI.Toolbar.syncOptimizeMode(targetMode);
+    }
+
+    // 6. Actualizar badge de la Titlebar inmediatamente
+    const tbMode = document.getElementById('titlebar-mode');
+    if (tbMode) {
+      tbMode.textContent = targetMode === 'max' ? 'MAX' : 'MIN';
+      tbMode.className = `titlebar-badge badge-mode ${targetMode}`;
+    }
+  };
+
+  global.DecisionTreeUI.setOptimizeMode = global.setOptimizeMode;
+
+  // Interceptar amigablemente toggleMinMax para sincronizar el Ribbon si es invocado externamente
+  if (typeof global.toggleMinMax === 'function') {
+    const originalToggle = global.toggleMinMax;
+    global.toggleMinMax = function() {
+      originalToggle();
+      const current = (typeof optimizeMode !== 'undefined') ? optimizeMode : global.optimizeMode;
+      if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
+        global.DecisionTreeUI.Toolbar.syncOptimizeMode(current);
+      }
+      const tbMode = document.getElementById('titlebar-mode');
+      if (tbMode) {
+        tbMode.textContent = current === 'max' ? 'MAX' : 'MIN';
+        tbMode.className = `titlebar-badge badge-mode ${current}`;
+      }
+    };
+  }
 
   // Exponer alias globales para modales si se invocan desde inline HTML
   global.closeValueInfoModal = function() {

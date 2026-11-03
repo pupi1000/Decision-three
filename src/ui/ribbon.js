@@ -99,15 +99,21 @@
       }
 
       const tbMode = document.getElementById('titlebar-mode');
+      const currentMode = (typeof optimizeMode !== 'undefined') ? optimizeMode : (global.optimizeMode || 'max');
       if (tbMode) {
-        const mode = global.optimizeMode || 'max';
-        tbMode.textContent = mode === 'max' ? 'MAX' : 'MIN';
-        tbMode.className = `titlebar-badge badge-mode ${mode}`;
+        tbMode.textContent = currentMode === 'max' ? 'MAX' : 'MIN';
+        tbMode.className = `titlebar-badge badge-mode ${currentMode}`;
       }
 
       // Sincronizar botones de Toolbar
       if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
-        global.DecisionTreeUI.Toolbar.syncOptimizeMode(global.optimizeMode || 'max');
+        global.DecisionTreeUI.Toolbar.syncOptimizeMode(currentMode);
+        if (typeof global.utilityMode !== 'undefined') {
+          global.DecisionTreeUI.Toolbar.syncUtilityMode(global.utilityMode, global.R);
+        }
+        if (typeof global.presentationMode !== 'undefined') {
+          global.DecisionTreeUI.Toolbar.syncPresentation(global.presentationMode);
+        }
         if (typeof global.history !== 'undefined' && typeof global.historyIdx !== 'undefined') {
           global.DecisionTreeUI.Toolbar.syncHistory(
             global.historyIdx > 0,

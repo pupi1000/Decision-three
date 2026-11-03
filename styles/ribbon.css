@@ -17,6 +17,7 @@
 .ribbon-tabs {
   display: flex;
   align-items: center;
+  height: 34px;
   padding: 0 16px;
   background: rgba(13, 17, 24, 0.6);
   border-bottom: 1px solid var(--border);
@@ -31,18 +32,23 @@
   font-family: 'Syne', sans-serif;
   font-size: 11px;
   font-weight: 700;
-  padding: 7px 15px;
+  height: 100%;
+  padding: 0 16px;
   cursor: pointer;
   position: relative;
-  transition: all .15s ease;
-  letter-spacing: 0.03em;
+  transition: color 0.15s ease, background 0.15s ease;
+  letter-spacing: 0.04em;
   user-select: none;
   border-radius: 4px 4px 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .ribbon-tab:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .ribbon-tab.active {
@@ -58,11 +64,17 @@
   right: 0;
   height: 2px;
   background: var(--brand);
+  box-shadow: 0 0 8px rgba(59, 162, 164, 0.4);
+}
+
+.ribbon-tab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }
 
 /* ── PANELES DE CONTENIDO (RIBBON CONTENT) ── */
 .ribbon-content {
-  height: 74px;
+  height: 76px;
   position: relative;
   overflow: hidden;
   background: var(--surface);
@@ -72,12 +84,31 @@
   display: none;
   height: 100%;
   padding: 4px 16px;
-  align-items: stretch;
+  align-items: center;
   gap: 6px;
   overflow-x: auto;
   overflow-y: hidden;
+  box-sizing: border-box;
 }
 
 .ribbon-panel.active {
   display: flex;
+}
+
+/* Scrollbar horizontal sutil para pantallas estrechas */
+.ribbon-panel::-webkit-scrollbar {
+  height: 3px;
+}
+
+.ribbon-panel::-webkit-scrollbar-track {
+  background: rgba(13, 17, 24, 0.5);
+}
+
+.ribbon-panel::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.ribbon-panel::-webkit-scrollbar-thumb:hover {
+  background: var(--brand);
 }

@@ -58,7 +58,7 @@
       {
         title: 'Criterio de Optimización',
         items: [
-          { id: 'ribbon-btn-max', action: 'set-optimize', actionParam: 'max', label: 'Maximizar', icon: 'opt-max', title: 'Criterio de Maximización: Seleccionar ramas de mayor beneficio esperado', className: 'active' },
+          { id: 'ribbon-btn-max', action: 'set-optimize', actionParam: 'max', label: 'Maximizar', icon: 'opt-max', title: 'Criterio de Maximización: Seleccionar ramas de mayor beneficio esperado', className: 'active opt-active-max' },
           { id: 'ribbon-btn-min', action: 'set-optimize', actionParam: 'min', label: 'Minimizar', icon: 'opt-min', title: 'Criterio de Minimización: Seleccionar ramas de menor costo esperado' }
         ]
       },
@@ -205,8 +205,36 @@
     syncOptimizeMode: function(mode) {
       const btnMax = document.getElementById('ribbon-btn-max');
       const btnMin = document.getElementById('ribbon-btn-min');
-      if (btnMax) btnMax.classList.toggle('active', mode === 'max');
-      if (btnMin) btnMin.classList.toggle('active', mode === 'min');
+      if (btnMax) {
+        const isMax = mode === 'max';
+        btnMax.classList.toggle('active', isMax);
+        btnMax.classList.toggle('opt-active-max', isMax);
+        btnMax.setAttribute('aria-pressed', isMax ? 'true' : 'false');
+      }
+      if (btnMin) {
+        const isMin = mode === 'min';
+        btnMin.classList.toggle('active', isMin);
+        btnMin.classList.toggle('opt-active-min', isMin);
+        btnMin.setAttribute('aria-pressed', isMin ? 'true' : 'false');
+      }
+    },
+
+    /**
+     * Sincroniza visualmente el botón de Utilidad de Riesgo y el valor R
+     */
+    syncUtilityMode: function(isCE, rVal) {
+      const btn = document.getElementById('btn-utility');
+      if (btn) {
+        btn.classList.toggle('active', !!isCE);
+        btn.classList.toggle('active-utility', !!isCE);
+        const icon = global.DecisionTreeUI.Components.Buttons.getIcon('utility-ce');
+        const label = isCE ? 'Modo CE' : 'Modo VE';
+        btn.innerHTML = `${icon}<span>${label}</span>`;
+      }
+      const inpR = document.getElementById('ribbon-inp-r');
+      if (inpR && rVal != null && document.activeElement !== inpR) {
+        inpR.value = rVal;
+      }
     },
 
     /**
