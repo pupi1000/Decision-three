@@ -12,6 +12,19 @@
   user-select: none;
   z-index: 40;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: max-height 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease;
+  max-height: 125px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Estado Contraído del Ribbon (FEAT-04) */
+.ribbon-bar.collapsed {
+  max-height: 0 !important;
+  opacity: 0 !important;
+  border-bottom: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
 /* ── PESTAÑAS HORIZONTALES (TABS) ── */

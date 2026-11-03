@@ -79,6 +79,72 @@
 
       // 7. Sincronización inicial
       this.syncStatus();
+
+      // 8. Restaurar preferencia de contracción/expansión (FEAT-04)
+      this.initCollapsedPreference();
+    },
+
+    /**
+     * Alterna el estado colapsado / expandido de la barra Ribbon
+     */
+    toggle: function() {
+      const bar = document.getElementById('ribbon-bar');
+      if (!bar) return;
+      this.setCollapsed(!bar.classList.contains('collapsed'), true);
+    },
+
+    /**
+     * Establece el estado colapsado / expandido de la barra Ribbon
+     * @param {boolean} isCollapsed Verdadero para colapsar, falso para expandir
+     * @param {boolean} [savePreference=true] Si debe guardar en localStorage
+     */
+    setCollapsed: function(isCollapsed, savePreference = true) {
+      const bar = document.getElementById('ribbon-bar');
+      const btn = document.getElementById('ribbon-toggle-btn');
+      if (!bar) return;
+
+      bar.classList.toggle('collapsed', isCollapsed);
+
+      if (btn) {
+        btn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        btn.title = isCollapsed ? 'Expandir barra de herramientas (Ctrl+F1)' : 'Contraer barra de herramientas (Ctrl+F1)';
+        btn.setAttribute('aria-label', isCollapsed ? 'Expandir barra de herramientas' : 'Contraer barra de herramientas');
+        btn.classList.toggle('active', isCollapsed);
+      }
+
+      if (savePreference) {
+        try {
+          localStorage.setItem('dtp_ribbon_collapsed', isCollapsed ? 'true' : 'false');
+        } catch (e) {}
+      }
+
+      if (typeof global.setStatus === 'function') {
+        global.setStatus(isCollapsed ? 'Barra Ribbon contraída — área de trabajo maximizada' : 'Barra Ribbon expandida');
+      }
+
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          if (typeof global.fitToScreen === 'function') {
+            global.fitToScreen();
+          }
+        }, 120);
+      });
+    },
+
+    /**
+     * Inicializa la preferencia de colapso desde localStorage
+     */
+    initCollapsedPreference: function() {
+      try {
+        const saved = localStorage.getItem('dtp_ribbon_collapsed');
+        if (saved === 'true') {
+          this.setCollapsed(true, false);
+        } else {
+          this.setCollapsed(false, false);
+        }
+      } catch (e) {
+        this.setCollapsed(false, false);
+      }
     },
 
     /**
@@ -141,6 +207,19 @@
   global.switchRibbonTab = function(tabId) {
     if (global.DecisionTreeUI && global.DecisionTreeUI.Tabs) {
       global.DecisionTreeUI.Tabs.switchTo(tabId);
+    }
+  };
+
+  // Exponer funciones globales de Ribbon para control y compatibilidad (FEAT-04)
+  global.toggleRibbon = function() {
+    if (global.DecisionTreeUI && global.DecisionTreeUI.Ribbon) {
+      global.DecisionTreeUI.Ribbon.toggle();
+    }
+  };
+
+  global.setRibbonCollapsed = function(isCollapsed, savePreference) {
+    if (global.DecisionTreeUI && global.DecisionTreeUI.Ribbon) {
+      global.DecisionTreeUI.Ribbon.setCollapsed(isCollapsed, savePreference);
     }
   };
 

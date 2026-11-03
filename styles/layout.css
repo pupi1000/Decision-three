@@ -144,6 +144,57 @@ header, .titlebar {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* ── CONTROL DE CONTRACCIÓN / EXPANSIÓN DEL RIBBON (FEAT-04) ── */
+.ribbon-toggle-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #7d8c9e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  box-sizing: border-box;
+  margin-left: 2px;
+}
+
+.ribbon-toggle-btn:hover {
+  background: rgba(59, 162, 164, 0.15);
+  border-color: rgba(59, 162, 164, 0.4);
+  color: #4DC4C6;
+}
+
+.ribbon-toggle-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.ribbon-toggle-btn.active {
+  background: rgba(59, 162, 164, 0.18);
+  border-color: rgba(59, 162, 164, 0.5);
+  color: #4DC4C6;
+}
+
+.ribbon-toggle-icon-collapse {
+  display: block;
+}
+
+.ribbon-toggle-icon-expand {
+  display: none;
+}
+
+.ribbon-toggle-btn.active .ribbon-toggle-icon-collapse {
+  display: none;
+}
+
+.ribbon-toggle-btn.active .ribbon-toggle-icon-expand {
+  display: block;
+}
+
 /* ── BARRA LATERAL COLAPSABLE (FEAT-04 / UI REFINEMENT) ── */
 .sidebar {
   width: 270px;

@@ -1195,6 +1195,43 @@ function toggleSidebar() {
 }
 if (typeof window !== 'undefined') window.toggleSidebar = toggleSidebar;
 
+/**
+ * Alterna el estado colapsado / expandido de la barra Ribbon superior (FEAT-04 / UI REFINEMENT)
+ */
+function toggleRibbon() {
+  if (typeof DecisionTreeUI !== 'undefined' && DecisionTreeUI.Ribbon && typeof DecisionTreeUI.Ribbon.toggle === 'function') {
+    DecisionTreeUI.Ribbon.toggle();
+    return;
+  }
+  const ribbonBar = document.getElementById('ribbon-bar');
+  if (!ribbonBar) return;
+  ribbonBar.classList.toggle('collapsed');
+  const isCollapsed = ribbonBar.classList.contains('collapsed');
+
+  const toggleBtn = document.getElementById('ribbon-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+    toggleBtn.title = isCollapsed ? 'Expandir barra de herramientas (Ctrl+F1)' : 'Contraer barra de herramientas (Ctrl+F1)';
+    toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expandir barra de herramientas' : 'Contraer barra de herramientas');
+    toggleBtn.classList.toggle('active', isCollapsed);
+  }
+
+  try {
+    localStorage.setItem('dtp_ribbon_collapsed', isCollapsed ? 'true' : 'false');
+  } catch (e) {}
+
+  if (typeof setStatus === 'function') {
+    setStatus(isCollapsed ? 'Barra Ribbon contraída — área de trabajo maximizada' : 'Barra Ribbon expandida');
+  }
+
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      if (typeof fitToScreen === 'function') fitToScreen();
+    }, 120);
+  });
+}
+if (typeof window !== 'undefined') window.toggleRibbon = toggleRibbon;
+
 function togglePresentation() {
   presentationMode = !presentationMode;
   document.body.classList.toggle('presentation-mode', presentationMode);
@@ -1704,6 +1741,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomOut(); }
   if (e.key === '0') { e.preventDefault(); fitToScreen(); }
   if (e.altKey && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); toggleSidebar(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'F1') { e.preventDefault(); toggleRibbon(); }
+  if (e.altKey && (e.key === 'r' || e.key === 'R')) { e.preventDefault(); toggleRibbon(); }
   const PS = 30;
   if (e.key === 'ArrowLeft')  { vp.x += PS; applyViewport(); }
   if (e.key === 'ArrowRight') { vp.x -= PS; applyViewport(); }
