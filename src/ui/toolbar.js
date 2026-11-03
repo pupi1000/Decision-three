@@ -78,7 +78,7 @@
         title: 'Probabilidad',
         items: [
           { action: 'open-bayes', label: 'Teorema Bayes', icon: 'bayes', title: 'Abrir Calculadora Bayesiana para actualizar probabilidades a posteriori' },
-          { action: 'open-sensitivity', label: 'Sensibilidad (∂)', icon: 'sensitivity', title: 'Abrir panel de análisis de sensibilidad probabilístico' }
+          { action: 'open-sensitivity', label: 'Sensibilidad (α)', icon: 'sensitivity', title: 'Abrir panel de análisis de sensibilidad probabilístico' }
         ]
       },
       {
