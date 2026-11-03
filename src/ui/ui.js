@@ -42,20 +42,23 @@
     let lastIdx = -1;
     let lastUtil = null;
     let lastPres = null;
+    let lastSel = undefined;
 
     const checkSync = () => {
       const currentMode = (typeof optimizeMode !== 'undefined') ? optimizeMode : global.optimizeMode;
-      const currentTree = global.tree;
+      const currentTree = (typeof tree !== 'undefined') ? tree : global.tree;
       const currentIdx = typeof global.historyIdx !== 'undefined' ? global.historyIdx : -1;
       const currentUtil = global.utilityMode;
       const currentPres = global.presentationMode;
+      const currentSel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
 
-      if (currentMode !== lastMode || currentTree !== lastTree || currentIdx !== lastIdx || currentUtil !== lastUtil || currentPres !== lastPres) {
+      if (currentMode !== lastMode || currentTree !== lastTree || currentIdx !== lastIdx || currentUtil !== lastUtil || currentPres !== lastPres || currentSel !== lastSel) {
         lastMode = currentMode;
         lastTree = currentTree;
         lastIdx = currentIdx;
         lastUtil = currentUtil;
         lastPres = currentPres;
+        lastSel = currentSel;
 
         if (this.Ribbon && typeof this.Ribbon.syncStatus === 'function') {
           this.Ribbon.syncStatus();

@@ -28,6 +28,13 @@
         configurable: true
       });
     }
+    if (typeof selectedNode !== 'undefined') {
+      Object.defineProperty(global, 'selectedNode', {
+        get: function() { return selectedNode; },
+        set: function(val) { selectedNode = val; },
+        configurable: true
+      });
+    }
   } catch (e) {
     console.warn('[DecisionTreeUI] optimizeMode / tree accessor:', e);
   }
@@ -209,17 +216,27 @@
      * Acciones rápidas contextuales sobre el nodo seleccionado
      */
     handleQuickAddBranch: function() {
-      if (global.selectedNode && typeof global.ctxAddBranch === 'function') {
-        global.ctxAddBranch();
+      const sel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
+      if (sel) {
+        if (sel.type === 'terminal') {
+          if (typeof global.setStatus === 'function') {
+            global.setStatus('⚠ Los nodos terminales representan resultados finales y no pueden tener ramas hijas. Selecciona un nodo de decisión o azar.');
+          }
+          return;
+        }
+        if (typeof global.ctxAddBranch === 'function') {
+          global.ctxAddBranch();
+        }
       } else if (!global.tree && typeof global.openAddModal === 'function') {
         global.openAddModal('decision');
       } else if (typeof global.setStatus === 'function') {
-        global.setStatus('ℹ Selecciona un nodo en el lienzo para agregarle una rama');
+        global.setStatus('ℹ Selecciona un nodo de decisión o azar en el lienzo para agregarle una rama');
       }
     },
 
     handleQuickEdit: function() {
-      if (global.selectedNode && typeof global.ctxEditNode === 'function') {
+      const sel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
+      if (sel && typeof global.ctxEditNode === 'function') {
         global.ctxEditNode();
       } else if (typeof global.setStatus === 'function') {
         global.setStatus('ℹ Selecciona un nodo en el lienzo para editar sus propiedades');
@@ -227,7 +244,8 @@
     },
 
     handleQuickDelete: function() {
-      if (global.selectedNode && typeof global.ctxDeleteNode === 'function') {
+      const sel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
+      if (sel && typeof global.ctxDeleteNode === 'function') {
         global.ctxDeleteNode();
       } else if (typeof global.setStatus === 'function') {
         global.setStatus('ℹ Selecciona un nodo en el lienzo para eliminarlo');

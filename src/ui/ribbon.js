@@ -108,6 +108,10 @@
       // Sincronizar botones de Toolbar
       if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar) {
         global.DecisionTreeUI.Toolbar.syncOptimizeMode(currentMode);
+        const currentSel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
+        if (typeof global.DecisionTreeUI.Toolbar.syncSelectionState === 'function') {
+          global.DecisionTreeUI.Toolbar.syncSelectionState(currentSel);
+        }
         if (typeof global.utilityMode !== 'undefined') {
           global.DecisionTreeUI.Toolbar.syncUtilityMode(global.utilityMode, global.R);
         }

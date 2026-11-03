@@ -4,6 +4,13 @@
 
 // ── Estado de Interfaz y Selección ──
 let selectedNode = null;
+try {
+  Object.defineProperty(window, 'selectedNode', {
+    get: () => selectedNode,
+    set: (v) => { selectedNode = v; },
+    configurable: true
+  });
+} catch (e) {}
 let modalType = 'decision';
 
 // ── Historia para Deshacer/Rehacer ──
@@ -535,6 +542,9 @@ function selectNodeById(id) {
 }
 
 function refreshSelectedPanel() {
+  if (window.DecisionTreeUI && window.DecisionTreeUI.Toolbar && typeof window.DecisionTreeUI.Toolbar.syncSelectionState === 'function') {
+    window.DecisionTreeUI.Toolbar.syncSelectionState(selectedNode);
+  }
   const panel = document.getElementById('selected-info');
   if (!panel) return;
   if (!selectedNode) {
@@ -562,19 +572,66 @@ function refreshSelectedPanel() {
 
 function deleteSelected() {
   if (!selectedNode || !tree) return;
+
+  // DEF-MOD-03: Confirmación preventiva antes de eliminar árbol completo o ramas con hijos
+  if (selectedNode.id === tree.id) {
+    const totalNodes = (typeof countNodes === 'function') ? countNodes(tree) : 0;
+    const confirmRoot = window.confirm(
+      `¿Desea eliminar el nodo raíz "${selectedNode.label}" (${selectedNode.id}) y todo el árbol de decisión completo? Esta acción eliminará permanentemente ${totalNodes} nodos.`
+    );
+    if (!confirmRoot) return;
+
+    snapshot();
+    tree = null;
+    selectedNode = null;
+    render();
+    refreshSelectedPanel();
+    setStatus('Árbol completo eliminado');
+    return;
+  }
+
+  const numDesc = (selectedNode.children && selectedNode.children.length > 0)
+    ? ((typeof countNodes === 'function') ? countNodes(selectedNode) - 1 : selectedNode.children.length)
+    : 0;
+
+  if (numDesc > 0) {
+    const confirmBranch = window.confirm(
+      `¿Desea eliminar el nodo "${selectedNode.label}" (${selectedNode.id}) y sus ${numDesc} ramas descendientes?`
+    );
+    if (!confirmBranch) return;
+  }
+
   snapshot();
-  if (selectedNode.id === tree.id) { tree = null; selectedNode = null; render(); refreshSelectedPanel(); return; }
   deleteFromTree(tree, selectedNode.id);
   selectedNode = null;
   render();
   refreshSelectedPanel();
   setStatus('Rama eliminada');
+  return;
 }
 
 // ═══════════════════════════════════════════════
-//  MODAL AGREGAR NODO
+//  MODAL AGREGAR NODO Y CONTROL DE ENVÍO (DEF-MOD-05)
 // ═══════════════════════════════════════════════
+let isConfirmingAdd = false;
+
+function resetAddModalState() {
+  isConfirmingAdd = false;
+  const btnConfirm = document.querySelector('#modal .modal-btn.confirm');
+  if (btnConfirm) {
+    btnConfirm.disabled = false;
+    btnConfirm.textContent = 'Agregar';
+  }
+}
+
 function openAddModal(type) {
+  // DEF-MOD-02: Impedir que un nodo terminal actúe como padre de nuevos nodos
+  if (tree && selectedNode && selectedNode.type === 'terminal') {
+    setStatus('⚠ Los nodos terminales representan resultados finales y no pueden tener ramas hijas. Selecciona un nodo de decisión o azar.');
+    return;
+  }
+
+  resetAddModalState();
   modalType = type || 'decision';
   selectType(modalType);
   document.getElementById('inp-label').value  = '';
@@ -642,67 +699,93 @@ function updateBranchesHint() {
 }
 
 function confirmAdd() {
-  snapshot();
-  const label   = document.getElementById('inp-label').value.trim() || 'Nuevo nodo';
-  const value   = parseFloat(document.getElementById('inp-value').value) || 0;
-  const prob    = parseFloat(document.getElementById('inp-prob').value);
-  const parent  = document.getElementById('inp-parent').value.trim();
-  const nBranches = (modalType !== 'terminal')
-    ? Math.max(2, Math.min(10, parseInt(document.getElementById('inp-branches').value) || 2))
-    : 0;
+  // DEF-MOD-05: Protección contra múltiples envíos (debouncing lógico y visual)
+  if (isConfirmingAdd) return;
 
-  nodeCounter++;
-  const prefix  = modalType === 'decision' ? 'D' : modalType === 'chance' ? 'C' : 'T';
-  const id      = prefix + nodeCounter;
+  const btnConfirm = document.querySelector('#modal .modal-btn.confirm');
+  if (btnConfirm) {
+    btnConfirm.disabled = true;
+    btnConfirm.textContent = 'Agregando...';
+  }
+  isConfirmingAdd = true;
 
-  // Crear el nodo principal
-  const newNode = {
-    id, type: modalType, label, value,
-    prob: isNaN(prob) ? null : prob,
-    children: []
-  };
+  try {
+    const parent = document.getElementById('inp-parent').value.trim();
 
-  // Crear ramas hijas automáticamente para decisión y azar
-  if (modalType !== 'terminal' && nBranches >= 2) {
-    const pEach = parseFloat((1 / nBranches).toFixed(4));
-    const pLast = parseFloat((1 - pEach * (nBranches - 1)).toFixed(4));
-    for (let i = 0; i < nBranches; i++) {
-      nodeCounter++;
-      const isLast  = i === nBranches - 1;
-      const branchP = modalType === 'chance'
-        ? (isLast ? pLast : pEach)
-        : null;
-      const branchLabel = modalType === 'chance'
-        ? `E${i + 1} (p=${(branchP * 100).toFixed(1)}%)`
-        : `Alternativa ${i + 1}`;
-      const branchNode = {
-        id: 'T' + nodeCounter,
-        type: 'terminal',
-        label: branchLabel,
-        value: 0,
-        prob: branchP,
-        children: []
-      };
-      newNode.children.push(branchNode);
+    // DEF-MOD-02: Validación reforzada al confirmar
+    if (tree) {
+      const parentNode = findNode(tree, parent);
+      if (parentNode && parentNode.type === 'terminal') {
+        setStatus('⚠ No se puede insertar: los nodos terminales no pueden tener ramas hijas');
+        resetAddModalState();
+        return;
+      }
     }
-  }
 
-  // Insertar en el árbol
-  if (!tree) {
-    tree = newNode;
-  } else {
-    const parentNode = findNode(tree, parent);
-    if (parentNode) parentNode.children.push(newNode);
-    else tree.children.push(newNode);
-  }
+    snapshot();
+    const label   = document.getElementById('inp-label').value.trim() || 'Nuevo nodo';
+    const value   = parseFloat(document.getElementById('inp-value').value) || 0;
+    const prob    = parseFloat(document.getElementById('inp-prob').value);
+    const nBranches = (modalType !== 'terminal')
+      ? Math.max(2, Math.min(10, parseInt(document.getElementById('inp-branches').value) || 2))
+      : 0;
 
-  closeModal();
-  render();
-  selectNodeById(id);
-  const msg = nBranches > 0
-    ? `Nodo "${label}" agregado con ${nBranches} ramas — edita las etiquetas con doble clic`
-    : `Nodo "${label}" agregado`;
-  setStatus(msg);
+    nodeCounter++;
+    const prefix  = modalType === 'decision' ? 'D' : modalType === 'chance' ? 'C' : 'T';
+    const id      = prefix + nodeCounter;
+
+    // Crear el nodo principal
+    const newNode = {
+      id, type: modalType, label, value,
+      prob: isNaN(prob) ? null : prob,
+      children: []
+    };
+
+    // Crear ramas hijas automáticamente para decisión y azar
+    if (modalType !== 'terminal' && nBranches >= 2) {
+      const pEach = parseFloat((1 / nBranches).toFixed(4));
+      const pLast = parseFloat((1 - pEach * (nBranches - 1)).toFixed(4));
+      for (let i = 0; i < nBranches; i++) {
+        nodeCounter++;
+        const isLast  = i === nBranches - 1;
+        const branchP = modalType === 'chance'
+          ? (isLast ? pLast : pEach)
+          : null;
+        const branchLabel = modalType === 'chance'
+          ? `E${i + 1} (p=${(branchP * 100).toFixed(1)}%)`
+          : `Alternativa ${i + 1}`;
+        const branchNode = {
+          id: 'T' + nodeCounter,
+          type: 'terminal',
+          label: branchLabel,
+          value: 0,
+          prob: branchP,
+          children: []
+        };
+        newNode.children.push(branchNode);
+      }
+    }
+
+    // Insertar en el árbol
+    if (!tree) {
+      tree = newNode;
+    } else {
+      const parentNode = findNode(tree, parent);
+      if (parentNode) parentNode.children.push(newNode);
+      else tree.children.push(newNode);
+    }
+
+    closeModal();
+    render();
+    selectNodeById(id);
+    const msg = nBranches > 0
+      ? `Nodo "${label}" agregado con ${nBranches} ramas — edita las etiquetas con doble clic`
+      : `Nodo "${label}" agregado`;
+    setStatus(msg);
+  } catch (err) {
+    console.error('Error al agregar nodo:', err);
+    resetAddModalState();
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -1405,6 +1488,16 @@ if (treeSvg) {
     isPanning = false;
     panMoved  = false;
     treeSvg.classList.remove('panning');
+  });
+
+  // Deseleccionar al hacer clic en el lienzo vacío
+  treeSvg.addEventListener('click', (e) => {
+    if (panMoved) return;
+    if (e.target === treeSvg || e.target.id === 'tree-layer') {
+      selectedNode = null;
+      render();
+      refreshSelectedPanel();
+    }
   });
 
   // ── Touch: pinch zoom + drag pan ──

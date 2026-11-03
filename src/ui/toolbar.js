@@ -65,9 +65,9 @@
       {
         title: 'Edición Rápida',
         items: [
-          { action: 'quick-add-branch', label: 'Agregar Rama', icon: 'branch-add', title: 'Agregar rama hijo al nodo actualmente seleccionado' },
-          { action: 'quick-edit', label: 'Editar Nodo', icon: 'branch-edit', title: 'Editar propiedades del nodo actualmente seleccionado' },
-          { action: 'quick-delete', label: 'Eliminar', icon: 'branch-delete', title: 'Eliminar el nodo seleccionado y sus descendientes', className: 'text-danger' }
+          { id: 'ribbon-btn-quick-add', action: 'quick-add-branch', label: 'Agregar Rama', icon: 'branch-add', title: 'Agregar rama hijo al nodo actualmente seleccionado', disabled: true },
+          { id: 'ribbon-btn-quick-edit', action: 'quick-edit', label: 'Editar Nodo', icon: 'branch-edit', title: 'Editar propiedades del nodo actualmente seleccionado', disabled: true },
+          { id: 'ribbon-btn-quick-delete', action: 'quick-delete', label: 'Eliminar', icon: 'branch-delete', title: 'Eliminar el nodo seleccionado y sus descendientes', className: 'text-danger', disabled: true }
         ]
       }
     ],
@@ -216,6 +216,32 @@
         btnMin.classList.toggle('active', isMin);
         btnMin.classList.toggle('opt-active-min', isMin);
         btnMin.setAttribute('aria-pressed', isMin ? 'true' : 'false');
+      }
+    },
+
+    /**
+     * Sincroniza reactivamente el estado de habilitación (disabled) de las herramientas contextuales
+     * DEF-MOD-04: Editar y Eliminar se habilitan con selección; Agregar Rama solo para Decisión y Azar
+     */
+    syncSelectionState: function(selNode) {
+      const btnAdd = document.getElementById('ribbon-btn-quick-add');
+      const btnEdit = document.getElementById('ribbon-btn-quick-edit');
+      const btnDelete = document.getElementById('ribbon-btn-quick-delete');
+
+      const hasSel = !!selNode;
+      const canAddBranch = hasSel && (selNode.type === 'decision' || selNode.type === 'chance');
+
+      if (btnAdd) {
+        btnAdd.disabled = !canAddBranch;
+        btnAdd.setAttribute('aria-disabled', (!canAddBranch).toString());
+      }
+      if (btnEdit) {
+        btnEdit.disabled = !hasSel;
+        btnEdit.setAttribute('aria-disabled', (!hasSel).toString());
+      }
+      if (btnDelete) {
+        btnDelete.disabled = !hasSel;
+        btnDelete.setAttribute('aria-disabled', (!hasSel).toString());
       }
     },
 
