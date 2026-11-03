@@ -1049,19 +1049,37 @@ function runSensitivity() {
 // ═══════════════════════════════════════════════
 let presentationMode = false;
 
-function togglePresentation() {
-  presentationMode = !presentationMode;
-  document.body.classList.toggle('presentation-mode', presentationMode);
-  document.getElementById('btn-present').classList.toggle('active', presentationMode);
-  if (presentationMode) {
-    setTimeout(fitToScreen, 80);
-    setStatus('Modo presentación — Esc para salir');
-  }
-}
-
-// ═══════════════════════════════════════════════
-//  EXPORTACIÓN (PNG Y SVG)
-// ═══════════════════════════════════════════════
+function togglePresentation() {
+  presentationMode = !presentationMode;
+  document.body.classList.toggle('presentation-mode', presentationMode);
+  
+  const btn = document.getElementById('btn-present');
+  if (btn) {
+    btn.classList.toggle('active', presentationMode);
+    btn.setAttribute('aria-pressed', presentationMode ? 'true' : 'false');
+  }
+
+  if (typeof window !== 'undefined' && window.DecisionTreeUI?.Toolbar?.syncPresentation) {
+    window.DecisionTreeUI.Toolbar.syncPresentation(presentationMode);
+  }
+
+  // Sincronización robusta: esperar a que el navegador complete el reflow del layout
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      fitToScreen();
+    }, 80);
+  });
+
+  if (presentationMode) {
+    setStatus('Modo presentación — Esc para salir');
+  } else {
+    setStatus('Modo presentación desactivado');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  EXPORTACIÓN (PNG Y SVG)
+// ═══════════════════════════════════════════════
 function exportPNG() {
   if (!tree || !lastPosMap) { setStatus('⚠ No hay árbol para exportar'); return; }
 

@@ -43,6 +43,8 @@
     let lastUtil = null;
     let lastPres = null;
     let lastSel = undefined;
+    let lastCollapsed = null;
+    let lastMinimap = null;
 
     const checkSync = () => {
       const currentMode = (typeof optimizeMode !== 'undefined') ? optimizeMode : global.optimizeMode;
@@ -51,14 +53,19 @@
       const currentUtil = global.utilityMode;
       const currentPres = global.presentationMode;
       const currentSel = (typeof selectedNode !== 'undefined') ? selectedNode : global.selectedNode;
+      const isCollapsed = document.querySelector('.sidebar')?.classList.contains('collapsed') || false;
+      const mm = document.getElementById('minimap-container');
+      const isMinimap = mm ? (mm.style.display !== 'none') : true;
 
-      if (currentMode !== lastMode || currentTree !== lastTree || currentIdx !== lastIdx || currentUtil !== lastUtil || currentPres !== lastPres || currentSel !== lastSel) {
+      if (currentMode !== lastMode || currentTree !== lastTree || currentIdx !== lastIdx || currentUtil !== lastUtil || currentPres !== lastPres || currentSel !== lastSel || isCollapsed !== lastCollapsed || isMinimap !== lastMinimap) {
         lastMode = currentMode;
         lastTree = currentTree;
         lastIdx = currentIdx;
         lastUtil = currentUtil;
         lastPres = currentPres;
         lastSel = currentSel;
+        lastCollapsed = isCollapsed;
+        lastMinimap = isMinimap;
 
         if (this.Ribbon && typeof this.Ribbon.syncStatus === 'function') {
           this.Ribbon.syncStatus();

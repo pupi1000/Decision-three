@@ -303,37 +303,70 @@
       }
     },
 
-    /**
-     * Alternar visibilidad de la barra lateral
-     */
-    handleToggleSidebar: function() {
-      const sidebar = document.querySelector('.sidebar');
-      if (sidebar) {
-        sidebar.classList.toggle('collapsed');
-        const isCollapsed = sidebar.classList.contains('collapsed');
-        if (typeof global.setStatus === 'function') {
-          global.setStatus(isCollapsed ? 'Barra lateral oculta — mayor espacio de trabajo' : 'Barra lateral visible');
-        }
-        setTimeout(() => {
-          if (typeof global.fitToScreen === 'function') global.fitToScreen();
-        }, 80);
-      }
-    },
-
-    /**
-     * Alternar visibilidad del minimapa
-     */
-    handleToggleMinimap: function() {
-      const mm = document.getElementById('minimap-container');
-      if (mm) {
-        const isHidden = mm.style.display === 'none';
-        mm.style.display = isHidden ? 'block' : 'none';
-        if (typeof global.setStatus === 'function') {
-          global.setStatus(isHidden ? 'Minimapa visible' : 'Minimapa oculto');
-        }
-      }
-    },
-
+    /**
+     * Alternar visibilidad de la barra lateral (DEF-VIS-02)
+     */
+    handleToggleSidebar: function() {
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar) {
+        sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.contains('collapsed');
+
+        // Sincronización visual y semántica del botón en Ribbon
+        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncSidebar === 'function') {
+          global.DecisionTreeUI.Toolbar.syncSidebar(isCollapsed);
+        } else {
+          const btn = document.querySelector('button[data-action="toggle-sidebar"]');
+          if (btn) {
+            btn.classList.toggle('active', isCollapsed);
+            btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
+          }
+        }
+
+        if (typeof global.setStatus === 'function') {
+          global.setStatus(isCollapsed ? 'Barra lateral oculta — mayor espacio de trabajo' : 'Barra lateral visible');
+        }
+
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (typeof global.fitToScreen === 'function') global.fitToScreen();
+          }, 80);
+        });
+      }
+    },
+
+    /**
+     * Alternar visibilidad del minimapa (DEF-VIS-03)
+     */
+    handleToggleMinimap: function() {
+      const mm = document.getElementById('minimap-container');
+      if (mm) {
+        // Determinar visibilidad real sin depender únicamente de estilos inline
+        const isHidden = mm.style.display === 'none';
+        const willBeVisible = isHidden;
+        mm.style.display = willBeVisible ? 'block' : 'none';
+
+        // Sincronización visual y semántica del botón en Ribbon
+        if (global.DecisionTreeUI && global.DecisionTreeUI.Toolbar && typeof global.DecisionTreeUI.Toolbar.syncMinimap === 'function') {
+          global.DecisionTreeUI.Toolbar.syncMinimap(willBeVisible);
+        } else {
+          const btn = document.querySelector('button[data-action="toggle-minimap"]');
+          if (btn) {
+            btn.classList.toggle('active', willBeVisible);
+            btn.setAttribute('aria-pressed', willBeVisible ? 'true' : 'false');
+          }
+        }
+
+        if (typeof global.setStatus === 'function') {
+          global.setStatus(willBeVisible ? 'Minimapa visible' : 'Minimapa oculto');
+        }
+
+        if (willBeVisible && typeof global.updateMinimap === 'function') {
+          global.updateMinimap();
+        }
+      }
+    },
+
     /**
      * Generación y copia del resumen ejecutivo del árbol
      */

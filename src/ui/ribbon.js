@@ -124,6 +124,15 @@
             global.historyIdx < global.history.length - 1
           );
         }
+        if (typeof global.DecisionTreeUI.Toolbar.syncSidebar === 'function') {
+          const sidebar = document.querySelector('.sidebar');
+          global.DecisionTreeUI.Toolbar.syncSidebar(sidebar ? sidebar.classList.contains('collapsed') : false);
+        }
+        if (typeof global.DecisionTreeUI.Toolbar.syncMinimap === 'function') {
+          const mm = document.getElementById('minimap-container');
+          const isMmVisible = mm ? (mm.style.display !== 'none') : true;
+          global.DecisionTreeUI.Toolbar.syncMinimap(isMmVisible);
+        }
       }
     }
   };

@@ -278,7 +278,32 @@
      */
     syncPresentation: function(isActive) {
       const btn = document.getElementById('btn-present');
-      if (btn) btn.classList.toggle('active', !!isActive);
+      if (btn) {
+        btn.classList.toggle('active', !!isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      }
+    },
+
+    /**
+     * Sincroniza visualmente el botón de la barra lateral (DEF-VIS-02)
+     */
+    syncSidebar: function(isCollapsed) {
+      const btn = document.querySelector('button[data-action="toggle-sidebar"]');
+      if (btn) {
+        btn.classList.toggle('active', !!isCollapsed);
+        btn.setAttribute('aria-pressed', isCollapsed ? 'true' : 'false');
+      }
+    },
+
+    /**
+     * Sincroniza visualmente el botón del minimapa (DEF-VIS-03)
+     */
+    syncMinimap: function(isVisible) {
+      const btn = document.querySelector('button[data-action="toggle-minimap"]');
+      if (btn) {
+        btn.classList.toggle('active', !!isVisible);
+        btn.setAttribute('aria-pressed', isVisible ? 'true' : 'false');
+      }
     }
   };
 
