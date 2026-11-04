@@ -98,7 +98,7 @@ function render() {
 
 function updateStats() {
   const isCe = (typeof utilityMode !== 'undefined' && utilityMode);
-  const mainVal = (isCe && tree) ? fmt(tree._ce) : (tree ? fmt(tree._ev) : '—');
+  const treeHasErr = (typeof hasTreeProbabilityErrors === 'function') && tree && hasTreeProbabilityErrors(tree);
   const statEv = document.getElementById('stat-ev');
   const statEvLabel = document.getElementById('stat-ev-label');
   const statDec = document.getElementById('stat-dec');
@@ -108,14 +108,15 @@ function updateStats() {
   const statCe = document.getElementById('stat-ce');
 
   if (statEv) {
-    statEv.textContent = (isCe && tree) ? fmt(tree._ce) : (tree ? fmt(tree._ev) : '—');
+    const val = (isCe && tree) ? tree._ce : (tree ? tree._ev : null);
+    statEv.textContent = (!treeHasErr && val !== null && val !== undefined && !isNaN(val)) ? fmt(val) : '—';
     statEv.className = 'stat-value ' + (isCe ? 'stat-ce-val' : 'gold');
   }
   if (statEvLabel) {
     statEvLabel.textContent = isCe ? 'CE óptimo' : 'VE óptimo';
   }
   if (statDec) {
-    const optLabel = tree ? findOptimalLabel(tree) : '—';
+    const optLabel = (!treeHasErr && tree) ? findOptimalLabel(tree) : '—';
     statDec.textContent = optLabel;
     statDec.title = optLabel;
   }
@@ -125,7 +126,7 @@ function updateStats() {
     statMode.textContent = optimizeMode === 'max' ? 'Maximizar ↑' : 'Minimizar ↓';
     statMode.style.color = optimizeMode === 'max' ? 'var(--gold)' : '#ff9f4a';
   }
-  if (statCe)     statCe.textContent     = (isCe && tree) ? fmt(tree._ce) : '—';
+  if (statCe)     statCe.textContent     = (!treeHasErr && isCe && tree && tree._ce !== null && !isNaN(tree._ce)) ? fmt(tree._ce) : '—';
   validateProbabilities();
 }
 
@@ -139,7 +140,8 @@ function drawConnectors(layer, node, posMap) {
     const cp = posMap[child.id];
     if (!cp) continue;
     const cx = cp.x, cy = cp.y + NH / 2;
-    const isOpt = child._optimal === true;
+    const treeHasErr = (typeof hasTreeProbabilityErrors === 'function') && tree && hasTreeProbabilityErrors(tree);
+    const isOpt = !treeHasErr && (child._optimal === true);
     const color = isOpt ? '#f5c842' : '#3a4258';
     const sw = isOpt ? 2 : 1.2;
     const dash = (!isOpt && node.type === 'decision') ? '5,3' : '';
@@ -207,7 +209,8 @@ function drawNodes(layer, node, posMap) {
   g.style.cursor = 'pointer';
   g.dataset.nodeId = node.id;
 
-  const isOpt = node._optimal === true;
+  const treeHasErr = (typeof hasTreeProbabilityErrors === 'function') && tree && hasTreeProbabilityErrors(tree);
+  const isOpt = !treeHasErr && (node._optimal === true);
   const isSel = selectedNode && selectedNode.id === node.id;
 
   if (node.type === 'decision') {
@@ -250,12 +253,16 @@ function drawNodes(layer, node, posMap) {
   evLabel.setAttribute('font-family', 'DM Mono, monospace'); evLabel.setAttribute('font-size', '9.5');
   evLabel.setAttribute('font-weight', '500');
   // En modo CE renderizar directamente CE: $... en púrpura sin duplicar elementos SVG (DEF-MCQ-07)
-  if (utilityMode && node._ce !== undefined) {
+  if (utilityMode && node._ce !== undefined && node._ce !== null) {
     evLabel.setAttribute('fill', '#c97ef7');
     evLabel.textContent = `CE: ${fmt(node._ce)}`;
   } else {
     evLabel.setAttribute('fill', node.type==='terminal' ? '#9b7ff4' : node.type==='chance' ? '#3BA2A4' : '#4f8ef7');
-    evLabel.textContent = node.type === 'terminal' ? fmt(node.value) : `VE: ${fmt(node._ev)}`;
+    if (node.type === 'terminal') {
+      evLabel.textContent = fmt(node.value);
+    } else {
+      evLabel.textContent = (!treeHasErr && node._ev !== null && node._ev !== undefined && !isNaN(node._ev)) ? `VE: ${fmt(node._ev)}` : 'VE: —';
+    }
   }
   g.appendChild(evLabel);
 
@@ -267,12 +274,16 @@ function drawNodes(layer, node, posMap) {
 
   // ── Badge Σp para nodos de azar ──
   if (node.type === 'chance' && node.children && node.children.length > 0) {
-    const sum = node.children.reduce((s, c) => s + (c.prob || 0), 0);
-    const valid = Math.abs(sum - 1.0) <= 0.001;
-    const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    const probInfo = (typeof validateNodeProbabilities === 'function')
+      ? validateNodeProbabilities(node)
+      : { valid: Math.abs(node.children.reduce((s, c) => s + (c.prob || 0), 0) - 1.0) <= 0.001, text: `Σ=${node.children.reduce((s, c) => s + (c.prob || 0), 0).toFixed(2)}`, statusClass: 'prob-badge warn' };
 
-    const badgeTxt = `Σ=${sum.toFixed(2)}`;
-    const bw = badgeTxt.length * 6.2 + 8;
+    const valid = probInfo.valid;
+    const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    badge.setAttribute('class', probInfo.statusClass);
+
+    const badgeTxt = probInfo.text;
+    const bw = badgeTxt.length * 6.2 + 10;
     const bx = pos.x + NW - bw / 2;
     const by = pos.y - 16;
 
