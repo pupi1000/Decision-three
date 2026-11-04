@@ -2,8 +2,25 @@
 
 **Versión:** 5.0.0  
 **Arquitectura:** SPA Modular Autónoma (Vanilla HTML5, CSS3, JavaScript ES6+)  
-**Feature:** FEAT-04 — Refactorización Exclusiva de UI e Implementación de Ribbon  
 **Estado:** Producción / Verificado  
+**Documentación Técnica Exhaustiva:** Ver [docs/README.md](file:///c:/Users/eguil/OneDrive/Desktop/decisionthree/DOCUMENTACION_PROYECTO.md)
+
+---
+
+## 👥 Historial de Evolución y Créditos del Equipo
+
+1. **Modularización del Monolito (FEAT-01):**
+   - *Responsable:* Einar Guillén (pupi1000).
+   - Desacoplamiento del index.html original de 2.700 líneas en tree_engine.js, canvas_ui.js y styles.css.
+2. **Arquitectura Ribbon UI y Vistas (FEAT-04 / FEAT-06):**
+   - *Responsable:* SaiPlusSai (refgu774@gmail.com).
+   - Creación de la interfaz modular por pestañas temáticas en src/ui/ y módulos de estilos en styles/.
+3. **Validación de Axiomas de Probabilidad (BUG-01):**
+   - *Responsable:* Einar Guillén (pupi1000).
+   - Cláusulas de guarda p ∈ [0, 1] por rama individual, badge dinámico y bloqueo de inducción errónea.
+4. **Continuidad de Rollback y Costos Netos (BUG-02):**
+   - *Responsable:* Einar Guillén (pupi1000).
+   - Propagación de ruta dorada continua en secuencias Azar -> Decisión y deducción de costos intermedios.
 
 ---
 

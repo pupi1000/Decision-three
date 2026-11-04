@@ -156,6 +156,7 @@ function drawConnectors(layer, node, posMap) {
     el.setAttribute('fill', 'none');
     el.setAttribute('stroke', color);
     el.setAttribute('stroke-width', sw);
+    if (isOpt) el.setAttribute('class', 'path-optimal');
     if (dash) el.setAttribute('stroke-dasharray', dash);
     el.setAttribute('marker-end', isOpt ? 'url(#arr-opt)' : 'url(#arr-nor)');
     layer.appendChild(el);
@@ -180,9 +181,13 @@ function drawConnectors(layer, node, posMap) {
       layer.appendChild(probEl);
     }
 
-    if (child.type !== 'terminal' && child.value && child.value !== 0) {
+    const branchCostDisplay = (child.cost !== undefined && child.cost !== null && child.cost !== 0)
+      ? -Math.abs(child.cost)
+      : (child.type !== 'terminal' && child.value && child.value !== 0 ? child.value : null);
+
+    if (branchCostDisplay !== null) {
       const valY = cy + 16;
-      const valTxt = fmt(child.value);
+      const valTxt = fmt(branchCostDisplay);
       const tw2 = valTxt.length * 6.5 + 8;
       const vbg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
       vbg.setAttribute('x', labelX - tw2/2); vbg.setAttribute('y', valY - 11);

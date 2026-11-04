@@ -121,6 +121,33 @@ function clearOptimalFlags(node) {
   }
 }
 
+// ═══════════════════════════════════════════════
+//  TRAZADO Y CONTINUIDAD DE LA RUTA ÓPTIMA (BUG-02)
+// ═══════════════════════════════════════════════
+function propagateOptimalPath(node, active = true) {
+  if (!node) return;
+  node._optimal = active;
+  if (!node.children || node.children.length === 0) return;
+
+  if (node.type === 'decision') {
+    // Para decisión: solo se activa la rama elegida (la que tiene _isChosen)
+    for (const c of node.children) {
+      const isChosen = active && (c._isChosen === true);
+      propagateOptimalPath(c, isChosen);
+    }
+  } else if (node.type === 'chance') {
+    // Para azar: si el azar está activo en la ruta óptima, TODAS sus ramas
+    // propagan el estado activo para asegurar la continuidad hacia decisiones subsecuentes
+    for (const c of node.children) {
+      propagateOptimalPath(c, active);
+    }
+  } else {
+    for (const c of node.children) {
+      propagateOptimalPath(c, false);
+    }
+  }
+}
+
 function calcEV(node) {
   if (!node) return 0;
 
@@ -139,7 +166,12 @@ function calcEV(node) {
         if (cev === null || isNaN(cev)) {
           childError = true;
         } else {
-          expectedSum += (c.prob || 0) * cev;
+          // BUG-02: Propagación neta de costos en ramas intermedias
+          const branchCost = (c.cost !== undefined && c.cost !== null && !isNaN(c.cost))
+            ? Number(c.cost)
+            : ((c.type === 'decision' && c.value !== undefined && c.value !== null && !isNaN(c.value)) ? -Number(c.value) : 0);
+          const effectiveVal = cev - branchCost;
+          expectedSum += (c.prob || 0) * effectiveVal;
         }
       }
       if (n.hasProbabilityError || childError) {
@@ -159,15 +191,21 @@ function calcEV(node) {
         if (cev === null || isNaN(cev)) {
           childError = true;
         } else {
-          const better = optimizeMode === 'max' ? cev > best : cev < best;
+          // BUG-02: Propagación neta de costos en alternativas
+          const branchCost = (c.cost !== undefined && c.cost !== null && !isNaN(c.cost))
+            ? Number(c.cost)
+            : 0;
+          const effectiveVal = cev - branchCost;
+          const better = optimizeMode === 'max' ? effectiveVal > best : effectiveVal < best;
           if (better) {
-            best = cev;
+            best = effectiveVal;
             opt = c;
           }
         }
       }
       for (const c of (n.children || [])) {
-        c._optimal = (c === opt && opt !== null && !childError);
+        c._isChosen = (c === opt && opt !== null && !childError);
+        c._optimal = c._isChosen;
       }
       if (childError || best === Infinity || best === -Infinity) {
         n._ev = null;
@@ -181,11 +219,12 @@ function calcEV(node) {
 
   const res = _eval(node);
 
-  if (hasTreeProbabilityErrors(node) || (typeof tree !== 'undefined' && tree && hasTreeProbabilityErrors(tree))) {
-    clearOptimalFlags(node);
-    if (typeof tree !== 'undefined' && tree) {
-      clearOptimalFlags(tree);
-    }
+  const treeRoot = (typeof tree !== 'undefined' && tree) ? tree : node;
+  if (hasTreeProbabilityErrors(treeRoot)) {
+    clearOptimalFlags(treeRoot);
+  } else {
+    // Si la raíz no tiene errores, propagar continuamente la ruta óptima desde la raíz
+    propagateOptimalPath(node, true);
   }
 
   return res;
@@ -270,6 +309,7 @@ function deepCloneWithNewIds(node) {
     type: node.type,
     label: node.label,
     value: node.value,
+    cost: node.cost,
     prob: node.prob,
     children: (node.children || []).map(c => deepCloneWithNewIds(c))
   };
@@ -357,6 +397,7 @@ if (typeof window !== 'undefined') {
   window.checkNodeProbabilities = validateNodeProbabilities;
   window.hasTreeProbabilityErrors = hasTreeProbabilityErrors;
   window.clearOptimalFlags = clearOptimalFlags;
+  window.propagateOptimalPath = propagateOptimalPath;
   window.calcEV = calcEV;
   window.calcCE = calcCE;
   window.calculateRollback = calcEV;
@@ -408,8 +449,16 @@ function calcCE(node) {
         return null;
       }
 
-      const minCE = Math.min(...n.children.map(c => c._ce || 0));
-      const sumExp = n.children.reduce((s, c) => s + (c.prob || 0) * Math.exp(-((c._ce || 0) - minCE) / R), 0);
+      // BUG-02: Propagación neta de costos en ramas de azar para CE
+      const netCEValues = n.children.map(c => {
+        const branchCost = (c.cost !== undefined && c.cost !== null && !isNaN(c.cost))
+          ? Number(c.cost)
+          : ((c.type === 'decision' && c.value !== undefined && c.value !== null && !isNaN(c.value)) ? -Number(c.value) : 0);
+        return (c._ce || 0) - branchCost;
+      });
+
+      const minCE = Math.min(...netCEValues);
+      const sumExp = n.children.reduce((s, c, idx) => s + (c.prob || 0) * Math.exp(-(netCEValues[idx] - minCE) / R), 0);
       const childrenCE = (sumExp > 0 && isFinite(sumExp)) ? minCE - R * Math.log(sumExp) : minCE;
 
       n._ce = childrenCE + (n.value || 0);
@@ -425,8 +474,12 @@ function calcCE(node) {
         if (c._ce === null || isNaN(c._ce)) {
           childError = true;
         } else {
-          const better = optimizeMode === 'max' ? c._ce > bestCE : c._ce < bestCE;
-          if (better) { bestCE = c._ce; opt = c; }
+          const branchCost = (c.cost !== undefined && c.cost !== null && !isNaN(c.cost))
+            ? Number(c.cost)
+            : 0;
+          const effectiveCE = (c._ce || 0) - branchCost;
+          const better = optimizeMode === 'max' ? effectiveCE > bestCE : effectiveCE < bestCE;
+          if (better) { bestCE = effectiveCE; opt = c; }
         }
       }
       for (const c of n.children) {
@@ -447,11 +500,11 @@ function calcCE(node) {
 
   const res = _evalCE(node);
 
-  if (hasTreeProbabilityErrors(node) || (typeof tree !== 'undefined' && tree && hasTreeProbabilityErrors(tree))) {
-    clearOptimalFlags(node);
-    if (typeof tree !== 'undefined' && tree) {
-      clearOptimalFlags(tree);
-    }
+  const treeRoot = (typeof tree !== 'undefined' && tree) ? tree : node;
+  if (hasTreeProbabilityErrors(treeRoot)) {
+    clearOptimalFlags(treeRoot);
+  } else {
+    propagateOptimalPath(node, true);
   }
 
   return res;
