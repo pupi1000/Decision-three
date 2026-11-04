@@ -541,7 +541,7 @@ function showTooltip(e, node) {
   const canvas = document.getElementById('canvas-area').getBoundingClientRect();
   document.getElementById('tt-title').textContent = node.label;
   document.getElementById('tt-type').textContent = {decision:'Decisión',chance:'Azar',terminal:'Terminal'}[node.type];
-  document.getElementById('tt-ev').textContent = node.type === 'terminal' ? fmt(node.value) : fmt(node._ev);
+  document.getElementById('tt-ev').textContent = node.type === 'terminal' ? fmt(node.value) : (node._ev !== null && node._ev !== undefined && !isNaN(node._ev) ? fmt(node._ev) : '—');
   document.getElementById('tt-prob').textContent = node.prob != null ? `${(node.prob*100).toFixed(0)}%` : '—';
   tt.style.left = (e.clientX - canvas.left + 14) + 'px';
   tt.style.top  = (e.clientY - canvas.top  + 14) + 'px';
@@ -621,7 +621,7 @@ function refreshSelectedPanel() {
     propsHtml += `
       <div class="node-prop-item">
         <span class="node-prop-label">VE calculado:</span>
-        <span class="node-prop-val" style="color:var(--gold)">${fmt(n._ev || 0)}</span>
+        <span class="node-prop-val" style="color:var(--gold)">${(n._ev !== null && !isNaN(n._ev)) ? fmt(n._ev) : '—'}</span>
       </div>
     `;
   }
