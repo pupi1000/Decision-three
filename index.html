@@ -6,162 +6,239 @@
 <title>DecisionTree Pro — AIGENOTECH</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles/layout.css">
+<link rel="stylesheet" href="styles/ribbon.css">
+<link rel="stylesheet" href="styles/toolbar.css">
+<link rel="stylesheet" href="styles/modals.css">
 </head>
 <body>
 
-<!-- HEADER -->
-<header>
-  <div class="logo">AIGENOTECH <span class="brand-dot"></span> DecisionTree Pro</div>
-  <div class="version-badge">v5.0.0</div>
-  <div class="header-sep"></div>
-  <button class="header-btn" onclick="loadExample('launch')">Ej: Lanzamiento</button>
-  <button class="header-btn" onclick="loadExample('invest')">Ej: Inversión</button>
-  <button class="header-btn" onclick="loadExample('bayes')">Ej: Bayesiano</button>
-  <button class="header-btn" id="btn-undo" onclick="undo()" title="Deshacer (Ctrl+Z)" disabled>↩ Deshacer</button>
-  <button class="header-btn" id="btn-redo" onclick="redo()" title="Rehacer (Ctrl+Y)" disabled>↪ Rehacer</button>
-  <button class="header-btn" id="btn-minmax" onclick="toggleMinMax()" title="Alternar Maximizar/Minimizar">↑ Maximizar</button>
-  <button class="header-btn" id="btn-utility" onclick="toggleUtilityMode()" title="Activar modo Utilidad de Riesgo (CE)">◎ VE</button>
-  <button class="header-btn" onclick="openSensitivity()" title="Análisis de sensibilidad">∂ Sensibilidad</button>
-  <button class="header-btn" onclick="openBayes()" title="Calculadora Bayesiana">𝑃 Bayes</button>
-  <button class="header-btn" onclick="togglePresentation()" id="btn-present" title="Modo presentación">⛶ Presentar</button>
-  <button class="header-btn" onclick="fitToScreen()" title="Ajustar al área visible">⊞ Ajustar</button>
-  <button class="header-btn" onclick="saveJSON()" title="Guardar árbol como archivo JSON">💾 Guardar</button>
-  <button class="header-btn" onclick="document.getElementById('inp-load').click()" title="Cargar árbol desde archivo JSON">📂 Cargar</button>
-  <input type="file" id="inp-load" accept=".json" style="display:none" onchange="loadJSON(event)">
-  <button class="header-btn" onclick="clearTree()">Limpiar</button>
-  <button class="header-btn" onclick="exportPNG()" title="Exportar como imagen PNG">⬇ PNG</button>
-  <button class="header-btn primary" onclick="exportSVG()">⬇ SVG</button>
+<!-- HEADER / TITLE BAR -->
+<header class="titlebar">
+  <div class="titlebar-left">
+    <div class="logo">AIGENOTECH <span class="brand-dot"></span> DecisionTree Pro</div>
+    <div class="version-badge">v5.0.0</div>
+  </div>
+  <div class="titlebar-center">
+    <div class="titlebar-doc" id="ribbon-doc-title">Lanzamiento de Producto</div>
+  </div>
+  <div class="titlebar-right">
+    <span class="titlebar-badge badge-mode max" id="titlebar-mode">MAX</span>
+    <span class="titlebar-badge badge-nodes" id="titlebar-nodes">0 nodos</span>
+    <button class="ribbon-toggle-btn" id="ribbon-toggle-btn"
+            onclick="toggleRibbon()"
+            aria-expanded="true"
+            aria-controls="ribbon-bar"
+            title="Contraer barra de herramientas (Ctrl+F1)"
+            aria-label="Contraer barra de herramientas">
+      <svg class="ribbon-toggle-icon-collapse" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="18 15 12 9 6 15"></polyline>
+      </svg>
+      <svg class="ribbon-toggle-icon-expand" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </button>
+  </div>
 </header>
+
+<!-- PUNTO DE MONTAJE: BARRA DE HERRAMIENTAS RIBBON (FEAT-04) -->
+<nav class="ribbon-bar" id="ribbon-bar" role="navigation" aria-label="Barra de herramientas Ribbon"></nav>
+
+<!-- Controles de compatibilidad para entrada de archivos y automatización -->
+<input type="file" id="inp-load" accept=".json" style="display:none" onchange="loadJSON(event)">
+<button id="btn-minmax" style="display:none" onclick="toggleMinMax()"></button>
 
 <!-- WORKSPACE -->
 <div class="workspace">
 
-  <!-- SIDEBAR -->
-  <div class="sidebar">
-
-    <div class="sidebar-section">
-      <div class="sidebar-title">Agregar nodo</div>
-      <button class="tool-btn" onclick="openAddModal('decision')">
-        <div class="tool-icon icon-dec">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <rect x="2" y="2" width="12" height="12" rx="1" fill="none" stroke="#4f8ef7" stroke-width="1.5"/>
-          </svg>
-        </div>
-        Decisión
-      </button>
-      <button class="tool-btn" onclick="openAddModal('chance')">
-        <div class="tool-icon icon-cha">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <circle cx="8" cy="8" r="5.5" fill="none" stroke="#3BA2A4" stroke-width="1.5"/>
-          </svg>
-        </div>
-        Azar / Evento
-      </button>
-      <button class="tool-btn" onclick="openAddModal('terminal')">
-        <div class="tool-icon icon-ter">
-          <svg width="16" height="16" viewBox="0 0 16 16">
-            <polygon points="2,2 14,8 2,14" fill="none" stroke="#9b7ff4" stroke-width="1.5"/>
-          </svg>
-        </div>
-        Terminal
+  <!-- SIDEBAR (FEAT-04 / UI REFINEMENT) -->
+  <aside class="sidebar" id="sidebar" role="complementary" aria-label="Panel lateral de información">
+    <!-- Cabecera de la barra lateral con botón de colapso -->
+    <div class="sidebar-header">
+      <div class="sidebar-header-info">
+        <svg class="sidebar-header-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="9" y1="3" x2="9" y2="21"></line>
+        </svg>
+        <span class="sidebar-header-title">Información</span>
+      </div>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn"
+              onclick="toggleSidebar()"
+              aria-expanded="true"
+              aria-controls="sidebar-body"
+              title="Contraer panel lateral (Alt+B)"
+              aria-label="Contraer panel lateral">
+        <svg class="toggle-icon-collapse" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+        <svg class="toggle-icon-expand" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"></polyline>
+        </svg>
       </button>
     </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-title">Leyenda</div>
-      <div class="legend-item">
-        <svg width="14" height="14" viewBox="0 0 14 14">
-          <rect x="1" y="1" width="12" height="12" rx="1" fill="none" stroke="#4f8ef7" stroke-width="1.5"/>
-        </svg>
-        Nodo de decisión
-      </div>
-      <div class="legend-item">
-        <svg width="14" height="14" viewBox="0 0 14 14">
-          <circle cx="7" cy="7" r="5.5" fill="none" stroke="#3BA2A4" stroke-width="1.5"/>
-        </svg>
-        Nodo de azar
-      </div>
-      <div class="legend-item">
-        <svg width="14" height="14" viewBox="0 0 14 14">
-          <polygon points="1,1 13,7 1,13" fill="none" stroke="#9b7ff4" stroke-width="1.5"/>
-        </svg>
-        Nodo terminal
-      </div>
-      <div class="legend-item">
-        <svg width="18" height="4" viewBox="0 0 18 4">
-          <line x1="0" y1="2" x2="18" y2="2" stroke="#f5c842" stroke-width="2"/>
-        </svg>
-        Rama óptima
-      </div>
-      <div class="legend-item">
-        <svg width="18" height="4" viewBox="0 0 18 4">
-          <line x1="0" y1="2" x2="18" y2="2" stroke="#4a5268" stroke-width="1.5" stroke-dasharray="3,2"/>
-        </svg>
-        Rama no óptima
-      </div>
+    <!-- Riel colapsado interactivo -->
+    <div class="sidebar-collapsed-rail" onclick="toggleSidebar()" title="Expandir panel lateral (Alt+B)" aria-label="Expandir panel lateral">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="9" y1="3" x2="9" y2="21"></line>
+      </svg>
+      <span class="collapsed-rail-text">INFORMACIÓN</span>
     </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-title">Resultados</div>
-      <div id="stats-panel">
-        <div class="stat-row">
-          <span class="stat-label">Modo</span>
-          <span class="stat-value" id="stat-mode" style="font-size:10px;color:var(--gold)">Maximizar</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">VE óptimo</span>
-          <span class="stat-value gold" id="stat-ev">—</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Decisión</span>
-          <span class="stat-value" id="stat-dec" style="font-size:10px">—</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Nodos</span>
-          <span class="stat-value" id="stat-nodes">0</span>
-        </div>
-        <div class="stat-row">
-          <span class="stat-label">Niveles</span>
-          <span class="stat-value" id="stat-levels">0</span>
-        </div>
-      </div>
-      <!-- Panel de alertas Σp ≠ 1.0 -->
-      <div class="prob-alert-panel" id="prob-alert-panel">
-        <div style="font-weight:700;margin-bottom:5px;color:#ff5f5f">⚠ Probabilidades inválidas</div>
-        <div id="prob-alert-list"></div>
-      </div>
-    </div>
+    <!-- Cuerpo del panel con scroll únicamente vertical -->
+    <div class="sidebar-body" id="sidebar-body">
 
-    <div class="sidebar-section" style="flex:1">
-      <div class="sidebar-title">Nodo seleccionado</div>
-      <div id="selected-info" style="font-size:11px; color:var(--muted); line-height:1.8">
-        Haz clic en un nodo para ver sus propiedades
-      </div>
-    </div>
-
-    <!-- Config utilidad de riesgo -->
-    <div class="sidebar-section">
-      <div class="sidebar-title">Utilidad de riesgo
-        <span id="utility-badge" style="display:none;margin-left:6px;font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(201,126,247,.15);color:#c97ef7;border:1px solid #c97ef7">CE activo</span>
-      </div>
-      <div style="font-size:10px;color:var(--muted);line-height:1.6;margin-bottom:6px">
-        Función exponencial: U(x) = 1 − e<sup>−x/R</sup><br>
-        R = tolerancia al riesgo (mismo orden que los valores del árbol)
-      </div>
-      <div class="utility-config open" id="utility-config">
-        <div class="utility-row">
-          <label>R (riesgo)</label>
-          <input class="utility-input" id="inp-R" type="number" value="100000" step="10000" onchange="onRChange()">
+      <!-- SECCIÓN A: LEYENDA -->
+      <div class="sidebar-section" id="section-legend">
+        <div class="sidebar-section-header">
+          <div class="sidebar-title">
+            <svg class="section-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Leyenda</span>
+          </div>
         </div>
-        <div class="stat-row" style="margin-top:4px">
-          <span class="stat-label">CE óptimo</span>
-          <span class="stat-value" id="stat-ce" style="color:#c97ef7">—</span>
+        <div class="legend-grid">
+          <div class="legend-item" title="Nodo de decisión (alternativas de acción)">
+            <div class="legend-symbol sym-dec">
+              <svg width="12" height="12" viewBox="0 0 14 14">
+                <rect x="1" y="1" width="12" height="12" rx="2" fill="none" stroke="#4f8ef7" stroke-width="1.8"/>
+              </svg>
+            </div>
+            <span class="legend-text">Decisión</span>
+          </div>
+          <div class="legend-item" title="Nodo de azar / evento (estados de la naturaleza con probabilidades)">
+            <div class="legend-symbol sym-cha">
+              <svg width="12" height="12" viewBox="0 0 14 14">
+                <circle cx="7" cy="7" r="5.2" fill="none" stroke="#3BA2A4" stroke-width="1.8"/>
+              </svg>
+            </div>
+            <span class="legend-text">Azar / Evento</span>
+          </div>
+          <div class="legend-item" title="Nodo terminal (desenlace o pago económico final)">
+            <div class="legend-symbol sym-ter">
+              <svg width="12" height="12" viewBox="0 0 14 14">
+                <polygon points="1.5,1.5 12.5,7 1.5,12.5" fill="none" stroke="#9b7ff4" stroke-width="1.8"/>
+              </svg>
+            </div>
+            <span class="legend-text">Terminal</span>
+          </div>
+          <div class="legend-item" title="Rama óptima identificada según el criterio de decisión">
+            <div class="legend-symbol sym-opt">
+              <svg width="16" height="4" viewBox="0 0 16 4">
+                <line x1="0" y1="2" x2="16" y2="2" stroke="#f5c842" stroke-width="2.2" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <span class="legend-text">Rama óptima</span>
+          </div>
+          <div class="legend-item" title="Rama no óptima o descartada en el análisis">
+            <div class="legend-symbol sym-nonopt">
+              <svg width="16" height="4" viewBox="0 0 16 4">
+                <line x1="0" y1="2" x2="16" y2="2" stroke="#505a70" stroke-width="1.8" stroke-dasharray="3,2"/>
+              </svg>
+            </div>
+            <span class="legend-text">Rama no óptima</span>
+          </div>
         </div>
-        <div style="font-size:10px;color:var(--muted);margin-top:4px" id="utility-status">Modo VE activo</div>
       </div>
-    </div>
 
-  </div>
+      <!-- SECCIÓN B: RESULTADOS -->
+      <div class="sidebar-section" id="section-results">
+        <div class="sidebar-section-header">
+          <div class="sidebar-title">
+            <svg class="section-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            <span>Resultados</span>
+          </div>
+        </div>
+        <div id="stats-panel" class="stats-panel">
+          <div class="stat-row">
+            <span class="stat-label">Criterio</span>
+            <span class="stat-value" id="stat-mode">Maximizar</span>
+          </div>
+          <div class="stat-row highlight-row">
+            <span class="stat-label" id="stat-ev-label">VE óptimo</span>
+            <span class="stat-value gold" id="stat-ev">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Decisión óptima</span>
+            <span class="stat-value stat-decision" id="stat-dec" title="Decisión recomendada">—</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Total nodos</span>
+            <span class="stat-value" id="stat-nodes">0</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">Profundidad</span>
+            <span class="stat-value" id="stat-levels">0</span>
+          </div>
+        </div>
+        <!-- Panel de alertas Σp ≠ 1.0 -->
+        <div class="prob-alert-panel" id="prob-alert-panel">
+          <div class="prob-alert-title">⚠ Probabilidades inválidas</div>
+          <div id="prob-alert-list"></div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN C: NODO SELECCIONADO -->
+      <div class="sidebar-section" id="section-selected">
+        <div class="sidebar-section-header">
+          <div class="sidebar-title">
+            <svg class="section-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Nodo seleccionado</span>
+          </div>
+        </div>
+        <div id="selected-info" class="selected-info-container">
+          <div class="selected-empty-state">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="empty-icon">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <p class="empty-text">Selecciona un nodo del árbol para consultar sus características y propiedades.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECCIÓN D: UTILIDAD DE RIESGO -->
+      <div class="sidebar-section" id="section-utility">
+        <div class="sidebar-section-header">
+          <div class="sidebar-title">
+            <svg class="section-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+            </svg>
+            <span>Utilidad de riesgo</span>
+            <span id="utility-badge" class="utility-badge">CE activo</span>
+          </div>
+        </div>
+        <div class="utility-desc">
+          Función exponencial U(x) = 1 − e<sup>−x/R</sup><br>
+          R = tolerancia al riesgo (mismo orden que los valores del árbol)
+        </div>
+        <div class="utility-config open" id="utility-config">
+          <div class="utility-row">
+            <label for="inp-R">R (riesgo)</label>
+            <input class="utility-input" id="inp-R" type="number" value="100000" step="10000" onchange="onRChange()" aria-label="Tolerancia al riesgo R">
+          </div>
+          <div class="stat-row" style="margin-top:4px">
+            <span class="stat-label">CE óptimo</span>
+            <span class="stat-value ce-val" id="stat-ce">—</span>
+          </div>
+          <div class="utility-status-msg" id="utility-status">Modo VE activo</div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
 
   <!-- CANVAS -->
   <div class="canvas-area" id="canvas-area">
@@ -427,7 +504,87 @@
   </div>
 </div>
 
+<!-- MODAL VALOR DE INFORMACIÓN (VEIP / VEIM - ROADMAP v5.1) -->
+<div class="modal-overlay" id="modal-value-info">
+  <div class="modal modal-wide">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Valor de la Información — Teoría de Decisiones</span>
+      <button class="sens-close" onclick="closeValueInfoModal()">✕</button>
+    </div>
+    
+    <div class="value-info-tabs">
+      <button class="value-info-tab active" id="tab-btn-veip" onclick="switchValueInfoTab('veip')">
+        VEIP (Información Perfecta)
+      </button>
+      <button class="value-info-tab" id="tab-btn-veim" onclick="switchValueInfoTab('veim')">
+        VEIM (Información Muestral)
+      </button>
+    </div>
+
+    <!-- Contenido VEIP -->
+    <div class="value-info-content active" id="content-veip">
+      <div class="value-info-badge">Roadmap v5.1 — En Desarrollo</div>
+      <h3 class="value-info-heading">Valor Esperado de la Información Perfecta (VEIP)</h3>
+      <p class="value-info-desc">
+        Representa la ganancia adicional esperada si el tomador de decisiones supiera de antemano y con certeza matemática absoluta cuál estado de la naturaleza ocurrirá antes de seleccionar la alternativa.
+      </p>
+      <div class="value-info-formula-card">
+        <div class="formula-label">FÓRMULA MATEMÁTICA:</div>
+        <div class="formula-math">VEIP = | VE con Información Perfecta − VE sin Información Perfecta |</div>
+        <div class="formula-sub">
+          <strong>VE<sub>con IP</sub></strong> = ∑ P(s<sub>j</sub>) · óptimo<sub>i</sub> [R<sub>ij</sub>]<br>
+          <strong>VE<sub>sin IP</sub></strong> = óptimo<sub>i</sub> [ ∑ P(s<sub>j</sub>) · R<sub>ij</sub> ] (Valor base del árbol actual)
+        </div>
+      </div>
+      <div class="value-info-note">
+        <strong>Interpretación gerencial:</strong> El VEIP fija el <em>límite presupuestario superior</em> para cualquier estudio o adquisición de datos. Ninguna organización racional debería pagar más que el VEIP por una investigación previa.
+      </div>
+      <div class="value-info-status">
+        <strong>Estado en DecisionTree Pro:</strong> En la versión 5.1, el motor recalculará dinámicamente el árbol invertido (nodos de azar previos a las decisiones) para generar el VEIP de forma automatizada sobre la estructura cargada.
+      </div>
+    </div>
+
+    <!-- Contenido VEIM -->
+    <div class="value-info-content" id="content-veim">
+      <div class="value-info-badge">Roadmap v5.1 — En Desarrollo</div>
+      <h3 class="value-info-heading">Valor Esperado de la Información Muestral (VEIM)</h3>
+      <p class="value-info-desc">
+        Mide el beneficio económico esperado que aporta un experimento, sondeo, auditoría o prueba piloto imperfecta cuyas verosimilitudes se actualizan mediante el Teorema de Bayes.
+      </p>
+      <div class="value-info-formula-card">
+        <div class="formula-label">FÓRMULA MATEMÁTICA:</div>
+        <div class="formula-math">VEIM = VE con Información Muestral − VE sin Información</div>
+        <div class="formula-sub">
+          <strong>VNIM (Valor Neto)</strong> = VEIM − Costo del Muestreo<br>
+          <strong>Eficiencia de la Información (E)</strong> = ( VEIM / VEIP ) × 100%
+        </div>
+      </div>
+      <div class="value-info-note">
+        <strong>Criterio de decisión:</strong> Si el <strong>VNIM &gt; 0</strong>, es económicamente aconsejable encargar el estudio previo o prueba piloto; si el VNIM ≤ 0, la recomendación óptima es proceder directamente sin incurrir en costos de muestreo.
+      </div>
+      <div class="value-info-status">
+        <strong>Estado en DecisionTree Pro:</strong> La versión 5.1 vinculará la actual <em>Calculadora Bayesiana</em> con la inserción automática de ramas de muestreo en el lienzo para calcular VEIM y eficiencia en un solo clic.
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:20px">
+      <button class="modal-btn" onclick="openBayes(); closeValueInfoModal();">Abrir Calculadora Bayesiana</button>
+      <button class="modal-btn confirm" onclick="closeValueInfoModal()">Entendido</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOTOR Y CANVAS EXISTENTES (PRESERVADOS INTACTOS) -->
 <script src="tree_engine.js"></script>
 <script src="canvas_ui.js"></script>
+
+<!-- CAPA MODULAR DE INTERFAZ DE USUARIO (FEAT-04) -->
+<script src="src/ui/components/buttons.js"></script>
+<script src="src/ui/components/tooltips.js"></script>
+<script src="src/ui/tabs.js"></script>
+<script src="src/ui/toolbar.js"></script>
+<script src="src/ui/ui-events.js"></script>
+<script src="src/ui/ribbon.js"></script>
+<script src="src/ui/ui.js"></script>
 </body>
 </html>

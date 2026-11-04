@@ -1,0 +1,229 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STYLES: LAYOUT & TITLEBAR (FEAT-04)
+   Responsabilidad: Estructura general, barra de título y modos de presentación.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── BARRA DE TÍTULO SUPERIOR (TITLEBAR) ── */
+header, .titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 40px;
+  background: #0d1118;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 2px solid var(--brand);
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 50;
+  box-sizing: border-box;
+}
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.titlebar .logo {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.titlebar .logo .brand-dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-hi);
+  box-shadow: 0 0 8px rgba(77, 196, 198, 0.7);
+  margin: 0 6px 1px 6px;
+  vertical-align: middle;
+}
+
+.titlebar .version-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #7d8c9e;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.titlebar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titlebar-doc {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 25px;
+  padding: 0 13px;
+  border-radius: 13px;
+  background: rgba(20, 26, 38, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #f0f3f8;
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: all 0.2s ease;
+}
+
+.titlebar-doc:hover {
+  border-color: rgba(59, 162, 164, 0.4);
+  background: rgba(24, 32, 48, 0.85);
+}
+
+.titlebar-doc::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3BA2A4;
+  box-shadow: 0 0 6px rgba(59, 162, 164, 0.7);
+  flex-shrink: 0;
+}
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titlebar-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  height: 22px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.badge-mode.max {
+  background: rgba(245, 200, 66, 0.12);
+  color: var(--gold);
+  border: 1px solid rgba(245, 200, 66, 0.35);
+  box-shadow: 0 0 8px rgba(245, 200, 66, 0.15);
+}
+
+.badge-mode.min {
+  background: rgba(255, 143, 90, 0.12);
+  color: #ff8f5a;
+  border: 1px solid rgba(255, 143, 90, 0.35);
+  box-shadow: 0 0 8px rgba(255, 143, 90, 0.15);
+}
+
+.badge-nodes {
+  background: rgba(255, 255, 255, 0.04);
+  color: #8c9ba5;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── CONTROL DE CONTRACCIÓN / EXPANSIÓN DEL RIBBON (FEAT-04) ── */
+.ribbon-toggle-btn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  color: #7d8c9e;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  box-sizing: border-box;
+  margin-left: 2px;
+}
+
+.ribbon-toggle-btn:hover {
+  background: rgba(59, 162, 164, 0.15);
+  border-color: rgba(59, 162, 164, 0.4);
+  color: #4DC4C6;
+}
+
+.ribbon-toggle-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.ribbon-toggle-btn.active {
+  background: rgba(59, 162, 164, 0.18);
+  border-color: rgba(59, 162, 164, 0.5);
+  color: #4DC4C6;
+}
+
+.ribbon-toggle-icon-collapse {
+  display: block;
+}
+
+.ribbon-toggle-icon-expand {
+  display: none;
+}
+
+.ribbon-toggle-btn.active .ribbon-toggle-icon-collapse {
+  display: none;
+}
+
+.ribbon-toggle-btn.active .ribbon-toggle-icon-expand {
+  display: block;
+}
+
+/* ── BARRA LATERAL COLAPSABLE (FEAT-04 / UI REFINEMENT) ── */
+.sidebar {
+  width: 270px;
+  flex-shrink: 0;
+  transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.sidebar.collapsed {
+  width: 44px;
+}
+
+/* ── INTEGRACIÓN CON MODO PRESENTACIÓN ── */
+body.presentation-mode header,
+body.presentation-mode .ribbon-bar,
+body.presentation-mode .sidebar,
+body.presentation-mode .bottom-bar,
+body.presentation-mode .zoom-controls,
+body.presentation-mode .minimap,
+body.presentation-mode .sensitivity-panel,
+body.presentation-mode .modal-overlay {
+  display: none !important;
+}
+
+body.presentation-mode .workspace {
+  height: 100vh;
+}
+
+body.presentation-mode .canvas-area {
+  flex: 1;
+  height: 100vh;
+}
