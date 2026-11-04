@@ -15,27 +15,180 @@ const MARGIN = 40;
 // ═══════════════════════════════════════════════
 //  MOTOR DE CÁLCULO (ROLLBACK)
 // ═══════════════════════════════════════════════
+// ═══════════════════════════════════════════════
+//  VALIDACIÓN DE AXIOMAS DE PROBABILIDAD (BUG-01)
+// ═══════════════════════════════════════════════
+function validateNodeProbabilities(node) {
+  if (!node || node.type !== 'chance') {
+    if (node) {
+      node.hasProbabilityError = false;
+      node.hasRangeError = false;
+    }
+    return {
+      hasRangeError: false,
+      hasProbabilityError: false,
+      sum: 0,
+      text: '',
+      statusClass: 'prob-badge ok',
+      valid: true
+    };
+  }
+
+  if (!node.children || node.children.length === 0) {
+    node.hasProbabilityError = false;
+    node.hasRangeError = false;
+    return {
+      hasRangeError: false,
+      hasProbabilityError: false,
+      sum: 0,
+      text: '',
+      statusClass: 'prob-badge ok',
+      valid: true
+    };
+  }
+
+  let hasRangeError = false;
+  let sum = 0;
+
+  for (const c of node.children) {
+    const rawP = c.prob;
+    const p = typeof rawP === 'string' ? parseFloat(rawP) : rawP;
+    if (p === null || p === undefined || isNaN(p) || p < 0.0 || p > 1.0) {
+      hasRangeError = true;
+    }
+    if (typeof p === 'number' && !isNaN(p)) {
+      sum += p;
+    }
+  }
+
+  node.hasRangeError = hasRangeError;
+  node._probSum = sum;
+
+  if (hasRangeError) {
+    node.hasProbabilityError = true;
+    return {
+      hasRangeError: true,
+      hasProbabilityError: true,
+      sum,
+      text: 'Err: p ∉ [0, 1]',
+      statusClass: 'prob-badge warn',
+      valid: false
+    };
+  }
+
+  const isSumValid = Math.abs(sum - 1.0) < 0.001;
+  if (!isSumValid) {
+    node.hasProbabilityError = true;
+    return {
+      hasRangeError: false,
+      hasProbabilityError: true,
+      sum,
+      text: `Σ=${sum.toFixed(2)} ≠ 1`,
+      statusClass: 'prob-badge warn',
+      valid: false
+    };
+  }
+
+  node.hasProbabilityError = false;
+  return {
+    hasRangeError: false,
+    hasProbabilityError: false,
+    sum,
+    text: 'Σ=1.00',
+    statusClass: 'prob-badge ok',
+    valid: true
+  };
+}
+
+function hasTreeProbabilityErrors(node) {
+  if (!node) return false;
+  if (node.type === 'chance' && node.children && node.children.length > 0) {
+    const res = validateNodeProbabilities(node);
+    if (res.hasProbabilityError) return true;
+  }
+  for (const c of (node.children || [])) {
+    if (hasTreeProbabilityErrors(c)) return true;
+  }
+  return false;
+}
+
+function clearOptimalFlags(node) {
+  if (!node) return;
+  node._optimal = false;
+  for (const c of (node.children || [])) {
+    c._optimal = false;
+    clearOptimalFlags(c);
+  }
+}
+
 function calcEV(node) {
   if (!node) return 0;
-  if (node.type === 'terminal') { node._ev = node.value || 0; return node._ev; }
-  if (node.type === 'chance') {
-    let ev = node.value || 0;
-    for (const c of node.children) ev += (c.prob || 0) * calcEV(c);
-    node._ev = ev; return ev;
-  }
-  if (node.type === 'decision') {
-    let best = optimizeMode === 'max' ? -Infinity : Infinity;
-    let opt = null;
-    for (const c of node.children) {
-      const ev = calcEV(c);
-      const better = optimizeMode === 'max' ? ev > best : ev < best;
-      if (better) { best = ev; opt = c; }
+
+  function _eval(n) {
+    if (!n) return null;
+    if (n.type === 'terminal') {
+      n._ev = (n.value !== null && n.value !== undefined && !isNaN(n.value)) ? Number(n.value) : 0;
+      return n._ev;
     }
-    for (const c of node.children) c._optimal = (c === opt);
-    node._ev = (best === Infinity || best === -Infinity) ? 0 : best;
-    return node._ev;
+    if (n.type === 'chance') {
+      validateNodeProbabilities(n);
+      let childError = false;
+      let expectedSum = 0;
+      for (const c of (n.children || [])) {
+        const cev = _eval(c);
+        if (cev === null || isNaN(cev)) {
+          childError = true;
+        } else {
+          expectedSum += (c.prob || 0) * cev;
+        }
+      }
+      if (n.hasProbabilityError || childError) {
+        n._ev = null;
+        return null;
+      }
+      const baseVal = (n.value !== null && n.value !== undefined && !isNaN(n.value)) ? Number(n.value) : 0;
+      n._ev = baseVal + expectedSum;
+      return n._ev;
+    }
+    if (n.type === 'decision') {
+      let best = optimizeMode === 'max' ? -Infinity : Infinity;
+      let opt = null;
+      let childError = false;
+      for (const c of (n.children || [])) {
+        const cev = _eval(c);
+        if (cev === null || isNaN(cev)) {
+          childError = true;
+        } else {
+          const better = optimizeMode === 'max' ? cev > best : cev < best;
+          if (better) {
+            best = cev;
+            opt = c;
+          }
+        }
+      }
+      for (const c of (n.children || [])) {
+        c._optimal = (c === opt && opt !== null && !childError);
+      }
+      if (childError || best === Infinity || best === -Infinity) {
+        n._ev = null;
+        return null;
+      }
+      n._ev = best;
+      return n._ev;
+    }
+    return 0;
   }
-  return 0;
+
+  const res = _eval(node);
+
+  if (hasTreeProbabilityErrors(node) || (typeof tree !== 'undefined' && tree && hasTreeProbabilityErrors(tree))) {
+    clearOptimalFlags(node);
+    if (typeof tree !== 'undefined' && tree) {
+      clearOptimalFlags(tree);
+    }
+  }
+
+  return res;
 }
 
 // ═══════════════════════════════════════════════
@@ -66,6 +219,7 @@ function countNodes(node) {
 
 function findOptimalLabel(node) {
   if (!node || node.type !== 'decision') return '—';
+  if (typeof hasTreeProbabilityErrors === 'function' && hasTreeProbabilityErrors(node)) return '—';
   for (const c of node.children) if (c._optimal) return c.label;
   return '—';
 }
@@ -90,15 +244,15 @@ function validateProbabilities() {
     <div class="prob-alert-row" style="margin-bottom:3px">
       <span class="prob-alert-id">${e.id}</span>
       <span style="color:var(--muted)">${e.label}</span>
-      <span style="color:#ff5f5f;font-family:'DM Mono',monospace">Σ=${e.sum.toFixed(3)}</span>
+      <span style="color:#ff5f5f;font-family:'DM Mono',monospace">${e.text}</span>
     </div>`).join('');
 }
 
 function collectProbErrors(node, errors) {
   if (node.type === 'chance' && node.children && node.children.length > 0) {
-    const sum = node.children.reduce((s, c) => s + (c.prob || 0), 0);
-    if (Math.abs(sum - 1.0) > 0.001) {
-      errors.push({ id: node.id, label: node.label.substring(0,16), sum });
+    const val = validateNodeProbabilities(node);
+    if (val.hasProbabilityError) {
+      errors.push({ id: node.id, label: node.label.substring(0,16), text: val.text, sum: val.sum });
     }
   }
   for (const c of (node.children || [])) collectProbErrors(c, errors);
@@ -197,6 +351,16 @@ if (typeof window !== 'undefined') {
   window.R = R;
   window.getRiskTolerance = getRiskTolerance;
   window.setRiskTolerance = setRiskTolerance;
+  window.validateNodeProbabilities = validateNodeProbabilities;
+  window.validateProbabilities = validateProbabilities;
+  window.checkProbabilities = validateNodeProbabilities;
+  window.checkNodeProbabilities = validateNodeProbabilities;
+  window.hasTreeProbabilityErrors = hasTreeProbabilityErrors;
+  window.clearOptimalFlags = clearOptimalFlags;
+  window.calcEV = calcEV;
+  window.calcCE = calcCE;
+  window.calculateRollback = calcEV;
+  window.solveTree = calcEV;
 }
 
 // U(x) = 1 - e^(-x/R)  →  CE(nodo) = -R * ln(1 - U)
@@ -216,45 +380,81 @@ function certainEquiv(u) {
 // Cálculo CE por rollback — paralelo a calcEV con preservación de costos parciales en azar multinivel
 function calcCE(node) {
   if (!node) return 0;
-  if (node.type === 'terminal') {
-    node._ce = node.value || 0;
-    node._u  = utility(node._ce);
-    return node._u;
-  }
-  if (node.type === 'chance') {
-    if (!node.children || node.children.length === 0) {
-      node._ce = node.value || 0;
-      node._u  = utility(node._ce);
-      return node._u;
-    }
-    // Evaluar recursivamente los subárboles de cada rama
-    for (const c of node.children) calcCE(c);
 
-    // Calcular el Equivalente Cierto de las ramas hijas mediante LogSumExp numéricamente estable
-    const minCE = Math.min(...node.children.map(c => c._ce || 0));
-    const sumExp = node.children.reduce((s, c) => s + (c.prob || 0) * Math.exp(-((c._ce || 0) - minCE) / R), 0);
-    const childrenCE = (sumExp > 0 && isFinite(sumExp)) ? minCE - R * Math.log(sumExp) : minCE;
-
-    // Incorporar el valor/costo parcial del nodo (propiedad delta de CARA: CE(X + k) = CE(X) + k)
-    node._ce = childrenCE + (node.value || 0);
-    node._u  = utility(node._ce);
-    return node._u;
-  }
-  if (node.type === 'decision') {
-    let bestCE = optimizeMode === 'max' ? -Infinity : Infinity;
-    let opt = null;
-    for (const c of node.children) {
-      calcCE(c);
-      const better = optimizeMode === 'max' ? c._ce > bestCE : c._ce < bestCE;
-      if (better) { bestCE = c._ce; opt = c; }
+  function _evalCE(n) {
+    if (!n) return null;
+    if (n.type === 'terminal') {
+      n._ce = (n.value !== null && n.value !== undefined && !isNaN(n.value)) ? Number(n.value) : 0;
+      n._u  = utility(n._ce);
+      return n._u;
     }
-    for (const c of node.children) c._optimal = (c === opt);
-    const resolvedCE = bestCE === -Infinity || bestCE === Infinity ? 0 : bestCE;
-    node._ce = resolvedCE + (node.value || 0);
-    node._u  = utility(node._ce);
-    return node._u;
+    if (n.type === 'chance') {
+      validateNodeProbabilities(n);
+      if (!n.children || n.children.length === 0) {
+        n._ce = (n.value !== null && n.value !== undefined && !isNaN(n.value)) ? Number(n.value) : 0;
+        n._u  = utility(n._ce);
+        return n._u;
+      }
+      let childError = false;
+      for (const c of n.children) {
+        const cu = _evalCE(c);
+        if (cu === null || isNaN(cu) || c._ce === null || isNaN(c._ce)) {
+          childError = true;
+        }
+      }
+      if (n.hasProbabilityError || childError) {
+        n._ce = null;
+        n._u  = null;
+        return null;
+      }
+
+      const minCE = Math.min(...n.children.map(c => c._ce || 0));
+      const sumExp = n.children.reduce((s, c) => s + (c.prob || 0) * Math.exp(-((c._ce || 0) - minCE) / R), 0);
+      const childrenCE = (sumExp > 0 && isFinite(sumExp)) ? minCE - R * Math.log(sumExp) : minCE;
+
+      n._ce = childrenCE + (n.value || 0);
+      n._u  = utility(n._ce);
+      return n._u;
+    }
+    if (n.type === 'decision') {
+      let bestCE = optimizeMode === 'max' ? -Infinity : Infinity;
+      let opt = null;
+      let childError = false;
+      for (const c of n.children) {
+        _evalCE(c);
+        if (c._ce === null || isNaN(c._ce)) {
+          childError = true;
+        } else {
+          const better = optimizeMode === 'max' ? c._ce > bestCE : c._ce < bestCE;
+          if (better) { bestCE = c._ce; opt = c; }
+        }
+      }
+      for (const c of n.children) {
+        c._optimal = (c === opt && opt !== null && !childError);
+      }
+      if (childError || bestCE === -Infinity || bestCE === Infinity) {
+        n._ce = null;
+        n._u  = null;
+        return null;
+      }
+      const resolvedCE = bestCE;
+      n._ce = resolvedCE + (n.value || 0);
+      n._u  = utility(n._ce);
+      return n._u;
+    }
+    return 0;
   }
-  return 0;
+
+  const res = _evalCE(node);
+
+  if (hasTreeProbabilityErrors(node) || (typeof tree !== 'undefined' && tree && hasTreeProbabilityErrors(tree))) {
+    clearOptimalFlags(node);
+    if (typeof tree !== 'undefined' && tree) {
+      clearOptimalFlags(tree);
+    }
+  }
+
+  return res;
 }
 
 // ═══════════════════════════════════════════════
