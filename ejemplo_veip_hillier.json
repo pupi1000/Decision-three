@@ -1,0 +1,68 @@
+{
+  "id": "D1",
+  "type": "decision",
+  "label": "Decisión de Expansión",
+  "value": 0,
+  "prob": null,
+  "children": [
+    {
+      "id": "C1",
+      "type": "chance",
+      "label": "Construir Planta Grande",
+      "value": 0,
+      "prob": null,
+      "children": [
+        {
+          "id": "T1",
+          "type": "terminal",
+          "label": "Demanda Favorable",
+          "value": 200000,
+          "prob": 0.6,
+          "children": []
+        },
+        {
+          "id": "T2",
+          "type": "terminal",
+          "label": "Demanda Desfavorable",
+          "value": -180000,
+          "prob": 0.4,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "type": "chance",
+      "label": "Construir Planta Pequeña",
+      "value": 0,
+      "prob": null,
+      "children": [
+        {
+          "id": "T3",
+          "type": "terminal",
+          "label": "Demanda Favorable",
+          "value": 100000,
+          "prob": 0.6,
+          "children": []
+        },
+        {
+          "id": "T4",
+          "type": "terminal",
+          "label": "Demanda Desfavorable",
+          "value": -20000,
+          "prob": 0.4,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "T5",
+      "type": "terminal",
+      "label": "No Hacer Nada",
+      "value": 0,
+      "prob": null,
+      "children": []
+    }
+  ]
+}
+

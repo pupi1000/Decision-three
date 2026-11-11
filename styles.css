@@ -1191,3 +1191,142 @@ body.presentation-mode .presentation-exit { display: block; }
   pointer-events: none;
 }
 #minimap-svg { width: 100%; height: 100%; }
+
+
+/* ═══════════════════════════════════════════════
+   ESTILOS MÓDULO VEIP (FEAT-02)
+   Valor Esperado de la Información Perfecta
+   ═══════════════════════════════════════════════ */
+.veip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 14px 0 16px 0;
+}
+
+.veip-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  transition: transform .15s ease, border-color .15s ease;
+}
+
+.veip-card:hover {
+  border-color: rgba(245, 200, 66, 0.4);
+  transform: translateY(-2px);
+}
+
+.veip-card.highlight {
+  background: rgba(245, 200, 66, 0.08);
+  border-color: var(--gold);
+  box-shadow: 0 0 16px rgba(245, 200, 66, 0.15);
+}
+
+.veip-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.veip-card-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.veip-card.highlight .veip-card-val {
+  color: var(--gold);
+  font-size: 20px;
+}
+
+.veip-card-sub {
+  font-size: 9.5px;
+  color: var(--muted);
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.veip-table-container {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  margin-bottom: 14px;
+}
+
+.veip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+}
+
+.veip-table th {
+  background: var(--surface2);
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.veip-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(42, 48, 64, 0.4);
+  color: var(--text);
+}
+
+.veip-table tr:last-child td {
+  border-bottom: none;
+}
+
+.veip-table tr.total-row {
+  background: rgba(245, 200, 66, 0.05);
+  font-weight: 700;
+}
+
+.veip-table td.best-decision {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.veip-table td.best-payoff {
+  color: var(--gold);
+}
+
+.veip-table td.contrib {
+  color: #a3e635;
+  font-weight: 700;
+}
+
+.veip-alert-box {
+  background: rgba(239, 68, 68, 0.1);
+  border-left: 3px solid var(--danger);
+  color: var(--danger);
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+
+.veip-info-box {
+  background: rgba(79, 142, 247, 0.08);
+  border-left: 3px solid #4f8ef7;
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 0 4px 4px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
