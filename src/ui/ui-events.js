@@ -132,8 +132,8 @@
         case 'open-veip':
           if (typeof global.openVEIP === 'function') { global.openVEIP(); } else { this.openValueInfoModal('veip'); }
           break;
-        case 'open-veim':
-          this.openValueInfoModal('veim');
+        case 'open-veim':
+          if (typeof global.openVEIM === 'function') { global.openVEIM(); } else { this.openValueInfoModal('veim'); }
           break;
         case 'toggle-utility':
           if (typeof global.toggleUtilityMode === 'function') global.toggleUtilityMode();
@@ -441,7 +441,11 @@
       if (btnVeip) btnVeip.classList.toggle('active', !isVeim);
       if (btnVeim) btnVeim.classList.toggle('active', isVeim);
       if (contentVeip) contentVeip.classList.toggle('active', !isVeim);
-      if (contentVeim) contentVeim.classList.toggle('active', isVeim);
+      if (contentVeim) contentVeim.classList.toggle('active', isVeim);
+
+      if (typeof global.updateReturnButton === 'function') {
+        global.updateReturnButton(type);
+      }
     }
   };
 
