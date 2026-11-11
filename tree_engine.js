@@ -7,7 +7,7 @@ let optimizeMode = 'max'; // 'max' | 'min'
 let clipboard = null;
 
 // Layout constants
-const NW = 110, NH = 48;
+const NW = 110, NH = 48, NW_TERM = 124;
 const HGAP = 110;
 const VGAP = 22;
 const MARGIN = 40;

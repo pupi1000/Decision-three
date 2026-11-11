@@ -81,7 +81,7 @@ function render() {
   lastPosMap = posMap;
 
   contentBounds = {
-    w: Math.max(...Object.values(posMap).map(p => p.x)) + NW + MARGIN,
+    w: Math.max(...Object.values(posMap).map(p => p.x)) + (typeof NW_TERM !== 'undefined' ? NW_TERM : NW) + MARGIN,
     h: Math.max(...Object.values(posMap).map(p => p.y)) + NH + MARGIN + 20
   };
 
@@ -235,40 +235,66 @@ function drawNodes(layer, node, posMap) {
     circle.setAttribute('stroke-width', isSel ? 2.5 : (isOpt ? 2 : 1.5));
     g.appendChild(circle);
   } else {
+    const termW = (typeof NW_TERM !== 'undefined' ? NW_TERM : 124);
     const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    poly.setAttribute('points', `${pos.x},${pos.y} ${pos.x+NW},${pos.y+NH/2} ${pos.x},${pos.y+NH}`);
+    poly.setAttribute('points', `${pos.x},${pos.y} ${pos.x+termW},${pos.y+NH/2} ${pos.x},${pos.y+NH}`);
     poly.setAttribute('fill', isSel ? 'rgba(155,127,244,.25)' : 'rgba(155,127,244,.10)');
     poly.setAttribute('stroke', isSel ? '#ffffff' : (isOpt ? '#f5c842' : '#9b7ff4'));
     poly.setAttribute('stroke-width', isSel ? 2.5 : (isOpt ? 2 : 1.5));
     g.appendChild(poly);
   }
 
-  const textX = node.type === 'terminal' ? pos.x + NW * 0.38 : pos.x + NW/2;
+  const isTerminal = node.type === 'terminal';
+  // BUG-04: Encuadre geométrico perfecto: textX centrado en la zona interior útil del triángulo,
+  // con font-size dinámico para que los textos nunca se salgan por la izquierda ni por la derecha
+  const textX = isTerminal ? pos.x + 40 : pos.x + NW/2;
+  const labelY = isTerminal ? pos.y + NH/2 - 5.5 : pos.y + NH/2 - 5;
+  const evLabelY = isTerminal ? pos.y + NH/2 + 5.5 : pos.y + NH/2 + 9;
+
   const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  label.setAttribute('x', textX); label.setAttribute('y', pos.y + NH/2 - 5);
+  label.setAttribute('x', textX); label.setAttribute('y', labelY);
   label.setAttribute('text-anchor', 'middle'); label.setAttribute('dominant-baseline', 'central');
-  label.setAttribute('font-family', 'Syne, sans-serif'); label.setAttribute('font-size', '11');
+  label.setAttribute('font-family', 'Syne, sans-serif');
   label.setAttribute('font-weight', '600'); label.setAttribute('fill', '#e8eaf0');
-  label.textContent = node.label.length > 14 ? node.label.substring(0,13)+'…' : node.label;
+  const shortLabel = node.label.length > 15 ? node.label.substring(0, 14) + '…' : node.label;
+  label.textContent = shortLabel;
+
+  // Ajuste dinámico de fuente para el nombre del nodo terminal para evitar desbordes
+  let labelFontSize = '11';
+  if (isTerminal) {
+    const len = shortLabel.length;
+    if (len >= 13) labelFontSize = '8.2';
+    else if (len >= 10) labelFontSize = '9.0';
+    else if (len >= 7) labelFontSize = '9.8';
+    else labelFontSize = '10.5';
+  }
+  label.setAttribute('font-size', labelFontSize);
   g.appendChild(label);
 
   const evLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-  evLabel.setAttribute('x', textX); evLabel.setAttribute('y', pos.y + NH/2 + 9);
+  evLabel.setAttribute('x', textX); evLabel.setAttribute('y', evLabelY);
   evLabel.setAttribute('text-anchor', 'middle'); evLabel.setAttribute('dominant-baseline', 'central');
-  evLabel.setAttribute('font-family', 'DM Mono, monospace'); evLabel.setAttribute('font-size', '9.5');
+  evLabel.setAttribute('font-family', 'DM Mono, monospace');
   evLabel.setAttribute('font-weight', '500');
+
+  let valText = '';
   // En modo CE renderizar directamente CE: $... en púrpura sin duplicar elementos SVG (DEF-MCQ-07)
   if (utilityMode && node._ce !== undefined && node._ce !== null) {
     evLabel.setAttribute('fill', '#c97ef7');
-    evLabel.textContent = `CE: ${fmt(node._ce)}`;
+    valText = `CE: ${fmt(node._ce)}`;
   } else {
-    evLabel.setAttribute('fill', node.type==='terminal' ? '#9b7ff4' : node.type==='chance' ? '#3BA2A4' : '#4f8ef7');
-    if (node.type === 'terminal') {
-      evLabel.textContent = fmt(node.value);
+    evLabel.setAttribute('fill', isTerminal ? '#9b7ff4' : node.type==='chance' ? '#3BA2A4' : '#4f8ef7');
+    if (isTerminal) {
+      valText = fmt(node.value);
     } else {
-      evLabel.textContent = (!treeHasErr && node._ev !== null && node._ev !== undefined && !isNaN(node._ev)) ? `VE: ${fmt(node._ev)}` : 'VE: —';
+      valText = (!treeHasErr && node._ev !== null && node._ev !== undefined && !isNaN(node._ev)) ? `VE: ${fmt(node._ev)}` : 'VE: —';
     }
   }
+  evLabel.textContent = valText;
+
+  // BUG-04: Ajuste dinámico de fuente para números con 6 o más caracteres (ej: $80.000, $200.000)
+  const valFontSize = (isTerminal && valText.length >= 9) ? '8' : (isTerminal && valText.length >= 6) ? '8.5' : '9.5';
+  evLabel.setAttribute('font-size', valFontSize);
   g.appendChild(evLabel);
 
   g.addEventListener('mouseenter', (e) => showTooltip(e, node));
@@ -329,8 +355,12 @@ function drawProbLabel(layer, node, pos) {
   const cfg = PROB_LABEL_COLORS[node.probLabel];
   const txt = cfg.name;
   const tw  = txt.length * 6 + 10;
-  const bx  = pos.x + (NW - tw) / 2;
-  const by  = pos.y + NH + 4;
+  const isTerminal = node.type === 'terminal';
+  const termW = (typeof NW_TERM !== 'undefined' ? NW_TERM : 124);
+  const nodeW = isTerminal ? termW : NW;
+  const bx  = pos.x + (nodeW - tw) / 2;
+  // BUG-04: Mayor separación vertical para nodos terminales para eliminar solapamiento con badges
+  const by  = pos.y + NH + (isTerminal ? 8 : 4);
 
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
   bg.setAttribute('x', bx); bg.setAttribute('y', by);
@@ -1504,19 +1534,32 @@ function renderNodesEx(lines, node, EX) {
   } else if (node.type === 'chance') {
     lines.push(`  <ellipse cx="${x + NW/2}" cy="${y + NH/2}" rx="${NW/2 - 1}" ry="${NH/2 - 1}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}"/>`);
   } else {
-    lines.push(`  <polygon points="${x},${y} ${x+NW},${y+NH/2} ${x},${y+NH}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}"/>`);
+    const termW = (typeof NW_TERM !== 'undefined' ? NW_TERM : 124);
+    lines.push(`  <polygon points="${x},${y} ${x+termW},${y+NH/2} ${x},${y+NH}" fill="${fillColor}" stroke="${borderColor}" stroke-width="${sw}"/>`);
   }
 
-  const textX = node.type === 'terminal' ? x + NW * 0.38 : x + NW / 2;
-  const shortLabel = node.label.length > 14 ? node.label.substring(0, 13) + '…' : node.label;
-  lines.push(`  <text x="${textX}" y="${y + NH/2 - 5}" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="600" fill="${EX.text}" font-family="'Syne',Arial,sans-serif">${escXml(shortLabel)}</text>`);
+  const isTerminal = node.type === 'terminal';
+  // BUG-04: Coordenadas y tipografía sincronizadas con el lienzo para nodos terminales
+  const textX = isTerminal ? x + 40 : x + NW / 2;
+  const labelY = isTerminal ? y + NH/2 - 5.5 : y + NH/2 - 5;
+  const evLabelY = isTerminal ? y + NH/2 + 5.5 : y + NH/2 + 9;
+  const shortLabel = node.label.length > 15 ? node.label.substring(0, 14) + '…' : node.label;
+  let labelFontSize = '11';
+  if (isTerminal) {
+    const len = shortLabel.length;
+    if (len >= 13) labelFontSize = '8.2';
+    else if (len >= 10) labelFontSize = '9.0';
+    else if (len >= 7) labelFontSize = '9.8';
+    else labelFontSize = '10.5';
+  }
+  lines.push(`  <text x="${textX}" y="${labelY}" text-anchor="middle" dominant-baseline="central" font-size="${labelFontSize}" font-weight="600" fill="${EX.text}" font-family="'Syne',Arial,sans-serif">${escXml(shortLabel)}</text>`);
 
   // DEF-EXP-01: Identificación rigurosa del modo analítico VE vs CE
   const isCeMode = (typeof utilityMode !== 'undefined' && utilityMode);
   let evTxt;
   let evFill;
 
-  if (node.type === 'terminal') {
+  if (isTerminal) {
     evTxt = fmt(node.value);
     evFill = EX.ter;
   } else if (isCeMode) {
@@ -1531,7 +1574,8 @@ function renderNodesEx(lines, node, EX) {
     evTxt = `VE: ${fmt(node._ev)}`;
     evFill = node.type === 'chance' ? EX.cha : EX.dec;
   }
-  lines.push(`  <text x="${textX}" y="${y + NH/2 + 9}" text-anchor="middle" dominant-baseline="central" font-size="9.5" font-weight="500" fill="${evFill}" class="mono" font-family="'DM Mono','Courier New',monospace">${escXml(evTxt)}</text>`);
+  const valFontSize = (isTerminal && evTxt.length >= 9) ? '8' : (isTerminal && evTxt.length >= 6) ? '8.5' : '9.5';
+  lines.push(`  <text x="${textX}" y="${evLabelY}" text-anchor="middle" dominant-baseline="central" font-size="${valFontSize}" font-weight="500" fill="${evFill}" class="mono" font-family="'DM Mono','Courier New',monospace">${escXml(evTxt)}</text>`);
 
   for (const child of (node.children || [])) renderNodesEx(lines, child, EX);
 }
@@ -2615,22 +2659,31 @@ if (typeof window !== 'undefined') {
 // Control de retorno entre modal de marco teórico y modales de cálculo
 let valueInfoReturnOrigin = null;
 
-function updateReturnButton(origin) {
+function updateReturnButton(origin, force) {
   const btnReturn = document.getElementById('btn-return-value-info');
   if (!btnReturn) return;
 
+  // Si no se fuerza y no había origen previo, mantener oculto
+  if (!force && !valueInfoReturnOrigin) {
+    btnReturn.style.display = 'none';
+    return;
+  }
+
   if (origin === 'veip' || origin === 'veim') {
     valueInfoReturnOrigin = origin;
+    if (typeof window !== 'undefined') window.valueInfoReturnOrigin = origin;
     btnReturn.style.display = 'inline-flex';
     btnReturn.textContent = origin === 'veip' ? '← Volver a VEIP' : '← Volver a VEIM';
   } else {
     valueInfoReturnOrigin = null;
+    if (typeof window !== 'undefined') window.valueInfoReturnOrigin = null;
     btnReturn.style.display = 'none';
   }
 }
 
 function showTheoryFrom(origin) {
   valueInfoReturnOrigin = origin; // 'veip' | 'veim'
+  if (typeof window !== 'undefined') window.valueInfoReturnOrigin = origin;
   if (origin === 'veip' && typeof closeVEIP === 'function') closeVEIP();
   if (origin === 'veim' && typeof closeVEIM === 'function') closeVEIM();
 
@@ -2638,7 +2691,7 @@ function showTheoryFrom(origin) {
     openValueInfoModal(origin);
   }
 
-  updateReturnButton(origin);
+  updateReturnButton(origin, true);
 }
 
 function returnFromValueInfo() {
