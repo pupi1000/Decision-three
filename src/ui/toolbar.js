@@ -84,7 +84,7 @@
       {
         title: 'Valor de Información',
         items: [
-          { action: 'open-veip', label: 'VEIP', icon: 'veip', title: 'Consultar fundamentos, formulación y roadmap de VEIP (Valor Esperado de Información Perfecta)', subBadge: 'v5.1' },
+          { action: 'open-veip', label: 'VEIP', icon: 'veip', title: 'Calcular Valor Esperado de Información Perfecta (VEIP) y análisis detallado de estados' },
           { action: 'open-veim', label: 'VEIM', icon: 'veim', title: 'Consultar fundamentos, formulación y roadmap de VEIM (Valor Esperado de Información Muestral)', subBadge: 'v5.1' }
         ]
       },

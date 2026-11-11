@@ -402,6 +402,7 @@ if (typeof window !== 'undefined') {
   window.calcCE = calcCE;
   window.calculateRollback = calcEV;
   window.solveTree = calcEV;
+  window.calculateVEIP = calculateVEIP;
 }
 
 // U(x) = 1 - e^(-x/R)  →  CE(nodo) = -R * ln(1 - U)
@@ -706,6 +707,262 @@ function runBayes() {
   container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   setStatus('Calculadora Bayesiana — tabla calculada');
 }
+
+
+// ═══════════════════════════════════════════════
+//  MÓDULO DE CÁLCULO DE VEIP (FEAT-02)
+//  Valor Esperado de la Información Perfecta
+//  Marco Teórico: Eppen / Hillier / Lieberman
+// ═══════════════════════════════════════════════
+function calculateVEIP(rootNode, mode) {
+  mode = mode || (typeof optimizeMode !== 'undefined' ? optimizeMode : 'max');
+  if (!rootNode) {
+    return {
+      success: false,
+      message: 'No hay un árbol de decisión disponible para calcular el VEIP.'
+    };
+  }
+
+  // Asegurar que el árbol tiene calculados sus valores esperados (Rollback)
+  if (typeof calcEV === 'function') {
+    calcEV(rootNode);
+  }
+
+  // Verificar si hay errores de probabilidad en el árbol
+  if (rootNode.hasProbabilityError) {
+    return {
+      success: false,
+      message: 'El árbol contiene errores en las probabilidades de los nodos de azar. Corrija los axiomas antes de calcular el VEIP.'
+    };
+  }
+
+  // Identificar la decisión principal
+  let decisionNode = null;
+  if (rootNode.type === 'decision') {
+    decisionNode = rootNode;
+  } else if (rootNode.type === 'chance' && rootNode.children) {
+    for (const c of rootNode.children) {
+      if (c.type === 'decision') {
+        decisionNode = c;
+        break;
+      }
+    }
+  }
+
+  if (!decisionNode || !decisionNode.children || decisionNode.children.length === 0) {
+    return {
+      success: false,
+      message: 'Estructura no válida: Para calcular el VEIP se requiere un nodo de decisión con alternativas evaluables.'
+    };
+  }
+
+  // Extraer las alternativas de decisión d_i y sus ramas de azar / terminales
+  const alternatives = [];
+  const chanceAlternatives = [];
+
+  for (const alt of decisionNode.children) {
+    const altLabel = alt.label || alt.id;
+    const branchCost = (alt.cost !== undefined && !isNaN(alt.cost)) ? Number(alt.cost) : 0;
+    const chanceUpfrontCost = (alt.value !== undefined && !isNaN(alt.value) && Number(alt.value) < 0) ? -Number(alt.value) : 0;
+    const chanceUpfrontReward = (alt.value !== undefined && !isNaN(alt.value) && Number(alt.value) > 0) ? Number(alt.value) : 0;
+    const totalDeduction = branchCost + chanceUpfrontCost - chanceUpfrontReward;
+
+    const altObj = {
+      id: alt.id,
+      label: altLabel,
+      type: alt.type,
+      cost: totalDeduction,
+      rawNode: alt,
+      states: [],
+      deterministicValue: null
+    };
+
+    if (alt.type === 'chance' && alt.children && alt.children.length > 0) {
+      if (alt.hasProbabilityError) {
+        return {
+          success: false,
+          message: 'El nodo de azar "' + altLabel + '" presenta inconsistencias de probabilidad.'
+        };
+      }
+      for (const st of alt.children) {
+        const stateLabel = st.label || st.id;
+        const prob = (st.prob !== undefined && !isNaN(st.prob)) ? Number(st.prob) : 0;
+        const stateCost = (st.cost !== undefined && !isNaN(st.cost)) ? Number(st.cost) : 0;
+        const basePayoff = (st.type === 'terminal' || !st.children || st.children.length === 0)
+          ? Number(st.value || 0)
+          : Number(st._ev !== undefined ? st._ev : (st.value || 0));
+
+        const netPayoff = basePayoff - stateCost - totalDeduction;
+
+        altObj.states.push({
+          id: st.id,
+          label: stateLabel,
+          prob: prob,
+          payoff: netPayoff
+        });
+      }
+      chanceAlternatives.push(altObj);
+    } else {
+      // Alternativa determinista (terminal directa o sin incertidumbre)
+      const basePayoff = Number(alt.value || 0);
+      altObj.deterministicValue = basePayoff - totalDeduction;
+    }
+
+    alternatives.push(altObj);
+  }
+
+  if (chanceAlternatives.length === 0) {
+    return {
+      success: false,
+      message: 'Estructura no válida: Ninguna alternativa de decisión contiene eventos de azar o incertidumbre para contrastar con información perfecta.'
+    };
+  }
+
+  // Verificar concordancia de estados de la naturaleza entre alternativas de azar
+  const baseStates = chanceAlternatives[0].states;
+  const numStates = baseStates.length;
+  let matchesByLabel = true;
+  let matchesByIndex = true;
+
+  for (let i = 1; i < chanceAlternatives.length; i++) {
+    const curr = chanceAlternatives[i].states;
+    if (curr.length !== numStates) {
+      matchesByLabel = false;
+      matchesByIndex = false;
+      break;
+    }
+    for (let s = 0; s < numStates; s++) {
+      if (curr[s].label.trim().toLowerCase() !== baseStates[s].label.trim().toLowerCase()) {
+        matchesByLabel = false;
+      }
+      if (Math.abs(curr[s].prob - baseStates[s].prob) > 0.05) {
+        matchesByIndex = false;
+      }
+    }
+  }
+
+  const isMax = (mode === 'max');
+  const vesip = (rootNode._ev !== undefined && rootNode._ev !== null) ? Number(rootNode._ev) : Number(rootNode.value || 0);
+  let vecip = 0;
+  const detailTable = [];
+
+  if (matchesByLabel || matchesByIndex) {
+    for (let s = 0; s < numStates; s++) {
+      const sName = matchesByLabel ? baseStates[s].label : ('Estado ' + (s + 1) + ' (' + baseStates[s].label + ')');
+      const sProb = baseStates[s].prob;
+
+      let bestDecision = null;
+      let bestPayoff = isMax ? -Infinity : Infinity;
+
+      for (const alt of alternatives) {
+        let pVal;
+        if (alt.deterministicValue !== null) {
+          pVal = alt.deterministicValue;
+        } else {
+          pVal = alt.states[s].payoff;
+        }
+
+        if (isMax) {
+          if (pVal > bestPayoff) {
+            bestPayoff = pVal;
+            bestDecision = alt.label;
+          }
+        } else {
+          if (pVal < bestPayoff) {
+            bestPayoff = pVal;
+            bestDecision = alt.label;
+          }
+        }
+      }
+
+      const contrib = sProb * bestPayoff;
+      vecip += contrib;
+      detailTable.push({
+        state: sName,
+        prob: sProb,
+        bestDecision: bestDecision,
+        bestPayoff: bestPayoff,
+        contribution: contrib
+      });
+    }
+  } else {
+    // Si los estados tienen etiquetas distintas, consolidar mapa de etiquetas únicas
+    const labelMap = new Map();
+    for (const ca of chanceAlternatives) {
+      for (const st of ca.states) {
+        if (!labelMap.has(st.label)) {
+          labelMap.set(st.label, { label: st.label, prob: st.prob });
+        }
+      }
+    }
+    const distinctStates = Array.from(labelMap.values());
+    const sumP = distinctStates.reduce((acc, x) => acc + x.prob, 0);
+
+    if (Math.abs(sumP - 1.0) <= 0.05) {
+      for (const dst of distinctStates) {
+        let bestDecision = null;
+        let bestPayoff = isMax ? -Infinity : Infinity;
+
+        for (const alt of alternatives) {
+          let pVal = null;
+          if (alt.deterministicValue !== null) {
+            pVal = alt.deterministicValue;
+          } else {
+            const found = alt.states.find(x => x.label.trim().toLowerCase() === dst.label.trim().toLowerCase());
+            if (found) pVal = found.payoff;
+          }
+
+          if (pVal !== null) {
+            if (isMax) {
+              if (pVal > bestPayoff) {
+                bestPayoff = pVal;
+                bestDecision = alt.label;
+              }
+            } else {
+              if (pVal < bestPayoff) {
+                bestPayoff = pVal;
+                bestDecision = alt.label;
+              }
+            }
+          }
+        }
+
+        if (bestDecision === null) {
+          bestDecision = '—';
+          bestPayoff = 0;
+        }
+
+        const contrib = dst.prob * bestPayoff;
+        vecip += contrib;
+        detailTable.push({
+          state: dst.label,
+          prob: dst.prob,
+          bestDecision: bestDecision,
+          bestPayoff: bestPayoff,
+          contribution: contrib
+        });
+      }
+    } else {
+      return {
+        success: false,
+        message: 'Para calcular el VEIP, las alternativas de azar deben compartir los mismos estados de la naturaleza (ej: Demanda Alta / Demanda Baja).'
+      };
+    }
+  }
+
+  const veip = Math.abs(vecip - vesip);
+
+  return {
+    success: true,
+    mode: mode,
+    vesip: vesip,
+    vecip: vecip,
+    veip: veip,
+    alternatives: alternatives.map(a => a.label),
+    detailTable: detailTable
+  };
+}
+
 
 // ═══════════════════════════════════════════════
 //  EJEMPLOS Y CARGA DE MODELOS PREDEFINIDOS

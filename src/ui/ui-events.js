@@ -130,7 +130,7 @@
           if (typeof global.openSensitivity === 'function') global.openSensitivity();
           break;
         case 'open-veip':
-          this.openValueInfoModal('veip');
+          if (typeof global.openVEIP === 'function') { global.openVEIP(); } else { this.openValueInfoModal('veip'); }
           break;
         case 'open-veim':
           this.openValueInfoModal('veim');
@@ -541,7 +541,13 @@
   }
 
   // Exponer alias globales para modales si se invocan desde inline HTML
-  global.closeValueInfoModal = function() {
+    global.openValueInfoModal = function(tabType) {
+    if (global.DecisionTreeUI && global.DecisionTreeUI.Events && typeof global.DecisionTreeUI.Events.openValueInfoModal === 'function') {
+      global.DecisionTreeUI.Events.openValueInfoModal(tabType || 'veip');
+    }
+  };
+
+global.closeValueInfoModal = function() {
     global.DecisionTreeUI.Events.closeValueInfoModal();
   };
   global.switchValueInfoTab = function(type) {

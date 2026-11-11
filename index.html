@@ -504,6 +504,28 @@
   </div>
 </div>
 
+
+<!-- MODAL DE CÁLCULO VEIP (FEAT-02) -->
+<div class="modal-overlay" id="modal-veip">
+  <div class="modal modal-wide">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Valor Esperado de la Información Perfecta (VEIP)</span>
+      <button class="sens-close" onclick="closeVEIP()">✕</button>
+    </div>
+    <div id="veip-modal-body" style="margin-top:10px">
+      <!-- Contenido generado dinámicamente por renderVEIPModal() -->
+    </div>
+    <div class="modal-actions" style="margin-top:16px;display:flex;justify-content:space-between;align-items:center">
+      <button class="modal-btn" id="veip-btn-download" onclick="downloadVEIPImage()" style="display:flex;align-items:center;gap:6px">🖼️ Descargar Resumen (PNG)</button>
+      <div style="display:flex;gap:8px">
+        <button class="modal-btn" onclick="closeVEIP(); openValueInfoModal('veip');">Ver Marco Teórico</button>
+        <button class="modal-btn confirm" onclick="closeVEIP()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <!-- MODAL VALOR DE INFORMACIÓN (VEIP / VEIM - ROADMAP v5.1) -->
 <div class="modal-overlay" id="modal-value-info">
   <div class="modal modal-wide">

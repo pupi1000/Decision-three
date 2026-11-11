@@ -13,6 +13,7 @@ Para facilitar la lectura y el mantenimiento, la documentación se ha organizado
 | [**02-RIBBON-UI-Y-VISTAS.md**](file:///c:/Users/eguil/OneDrive/Desktop/decisionthree/docs/02-RIBBON-UI-Y-VISTAS.md) | Sistema de interfaz por pestañas Ribbon (FEAT-04), componentes modulares en `src/ui/`, temas en `styles/` y mejoras de vista/exportación (FEAT-06). | SaiPlusSai (`refgu774@gmail.com`) |
 | [**03-BUG-01-PROBABILIDADES.md**](file:///c:/Users/eguil/OneDrive/Desktop/decisionthree/docs/03-BUG-01-PROBABILIDADES.md) | Diagnóstico, teoría matemática (Axiomas de Kolmogorov), implementación de cláusulas de guarda $0 \le p_i \le 1$, badges visuales y bloqueo de inducción errónea. | Einar Guillén (`pupi1000`) |
 | [**04-BUG-02-CONTINUIDAD-Y-COSTOS.md**](file:///c:/Users/eguil/OneDrive/Desktop/decisionthree/docs/04-BUG-02-CONTINUIDAD-Y-COSTOS.md) | Continuidad del camino óptimo en secuencias Azar $\rightarrow$ Decisión (`propagateOptimalPath`), deducción neta de costos intermedios y suite de pruebas unitarias. | Einar Guillén (`pupi1000`) |
+| [**05-FEAT-02-CALCULO-VEIP.md**](file:///c:/Users/eguil/OneDrive/Desktop/decisionthree/docs/05-FEAT-02-CALCULO-VEIP.md) | Módulo automatizado de cálculo de VEIP (Eppen / Hillier), tarjetas métricas interactivas y exportación de resumen analítico. | Einar Guillén (pupi1000) |
 
 ---
 

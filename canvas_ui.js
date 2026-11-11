@@ -1903,3 +1903,357 @@ if (document.readyState === 'loading') {
   loadExample('launch');
 }
 
+
+
+
+// ═══════════════════════════════════════════════
+//  MÓDULO DE INTERFAZ VEIP (FEAT-02)
+// ═══════════════════════════════════════════════
+let veipLastResult = null;
+
+function openVEIP() {
+  if (!tree) {
+    if (typeof setStatus === 'function') setStatus('⚠ Carga un árbol de decisión primero');
+    return;
+  }
+
+  // Ejecutar cálculo automático de VEIP
+  if (typeof calculateVEIP === 'function') {
+    veipLastResult = calculateVEIP(tree, optimizeMode);
+    renderVEIPModal(veipLastResult);
+  }
+
+  const modal = document.getElementById('modal-veip');
+  if (modal) {
+    modal.classList.add('open');
+  } else {
+    // Si se usa modal unificado de valor de información
+    const valModal = document.getElementById('modal-value-info');
+    if (valModal) {
+      valModal.classList.add('open');
+      if (typeof switchValueInfoTab === 'function') switchValueInfoTab('veip');
+    }
+  }
+}
+
+function closeVEIP() {
+  const modal = document.getElementById('modal-veip');
+  if (modal) modal.classList.remove('open');
+  const valModal = document.getElementById('modal-value-info');
+  if (valModal) valModal.classList.remove('open');
+}
+
+function renderVEIPModal(res) {
+  const container = document.getElementById('veip-modal-body');
+  if (!container) return;
+
+  if (!res || !res.success) {
+    container.innerHTML = `
+      <div class="veip-alert-box">
+        <strong>Estructura no compatible:</strong> ${res && res.message ? res.message : 'No se pudo calcular el VEIP para el modelo actual.'}
+      </div>
+      <div class="value-info-formula-card" style="margin-top:10px">
+        <div class="formula-label">REQUISITOS METODOLÓGICOS (Eppen / Hillier):</div>
+        <div class="formula-sub">
+          El árbol debe contener al menos un <strong>Nodo de Decisión</strong> principal cuyas alternativas desemboquen en <strong>Nodos de Azar</strong> con probabilidades bien definidas (Σ=1.0) que representen los mismos estados de la naturaleza.
+        </div>
+      </div>
+    `;
+    const btnCopy = document.getElementById('veip-btn-copy');
+    if (btnCopy) btnCopy.style.display = 'none';
+    return;
+  }
+
+  const btnCopy = document.getElementById('veip-btn-copy');
+  if (btnCopy) btnCopy.style.display = 'inline-block';
+
+  let tableRows = '';
+  res.detailTable.forEach(row => {
+    tableRows += `
+      <tr>
+        <td><strong>${escXml(row.state)}</strong></td>
+        <td>${(row.prob * 100).toFixed(1)}% <span style="color:var(--muted)">(${row.prob.toFixed(3)})</span></td>
+        <td class="best-decision">✔ ${escXml(row.bestDecision)}</td>
+        <td class="best-payoff">${fmt(row.bestPayoff)}</td>
+        <td class="contrib">${fmt(row.contribution)}</td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="veip-grid">
+      <div class="veip-card">
+        <span class="veip-card-label">VEsIP (Sin Inf. Perfecta)</span>
+        <span class="veip-card-val">${fmt(res.vesip)}</span>
+        <span class="veip-card-sub">Valor actual por Rollback</span>
+      </div>
+      <div class="veip-card">
+        <span class="veip-card-label">VEcIP (Con Inf. Perfecta)</span>
+        <span class="veip-card-val">${fmt(res.vecip)}</span>
+        <span class="veip-card-sub">Decisión óptima a posteriori</span>
+      </div>
+      <div class="veip-card highlight">
+        <span class="veip-card-label">VEIP (Tope Presupuestario)</span>
+        <span class="veip-card-val">${fmt(res.veip)}</span>
+        <span class="veip-card-sub">Valor máximo a pagar por datos</span>
+      </div>
+    </div>
+
+    <div class="veip-info-box">
+      <strong>Interpretación Analítica:</strong> Si dispusieras de información perfecta sobre qué estado ocurrirá, el rendimiento esperado ascendería a <strong>${fmt(res.vecip)}</strong>. Por tanto, el valor económico máximo que justifica invertir en una investigación o estudio previo es de exactamente <strong>${fmt(res.veip)}</strong>.
+    </div>
+
+    <div class="veip-table-container">
+      <table class="veip-table">
+        <thead>
+          <tr>
+            <th>Estado de la Naturaleza</th>
+            <th>Probabilidad P(θ)</th>
+            <th>Decisión Óptima</th>
+            <th>Pago Asociado</th>
+            <th>Contribución Ponderada</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          <tr class="total-row">
+            <td><strong>TOTAL (VEcIP)</strong></td>
+            <td><strong>100.0%</strong></td>
+            <td>—</td>
+            <td>—</td>
+            <td class="contrib" style="font-size:12px">${fmt(res.vecip)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function copyVEIPSummary() {
+  if (!veipLastResult || !veipLastResult.success) {
+    if (typeof setStatus === 'function') setStatus('⚠ No hay resultados de VEIP para copiar');
+    return;
+  }
+  const r = veipLastResult;
+  let text = `===================================================\n`;
+  text += ` REPORTE ANALÍTICO: VALOR ESPERADO DE INFORMACIÓN PERFECTA (VEIP)\n`;
+  text += ` DecisionTree Pro — AIGENOTECH\n`;
+  text += `===================================================\n\n`;
+  text += `Criterio de optimización: ${r.mode === 'max' ? 'Maximizar Beneficio' : 'Minimizar Costo'}\n`;
+  text += `VEsIP (Sin Información): ${fmt(r.vesip)}\n`;
+  text += `VEcIP (Con Información): ${fmt(r.vecip)}\n`;
+  text += `---------------------------------------------------\n`;
+  text += `VEIP (Límite Presupuestario Máximo): ${fmt(r.veip)}\n`;
+  text += `---------------------------------------------------\n\n`;
+  text += `DESGLOSE POR ESTADO DE LA NATURALEZA:\n`;
+  r.detailTable.forEach(row => {
+    text += ` - ${row.state} (P=${(row.prob*100).toFixed(1)}%): Óptimo="${row.bestDecision}" | Pago=${fmt(row.bestPayoff)} | Contrib=${fmt(row.contribution)}\n`;
+  });
+  text += `\n===================================================\n`;
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (typeof setStatus === 'function') setStatus('✔ Resumen de VEIP copiado al portapapeles');
+    }).catch(() => {
+      prompt('Copia el resumen de VEIP:', text);
+    });
+  } else {
+    prompt('Copia el resumen de VEIP:', text);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.openVEIP = openVEIP;
+  window.closeVEIP = closeVEIP;
+  window.renderVEIPModal = renderVEIPModal;
+  window.copyVEIPSummary = copyVEIPSummary;
+  window.downloadVEIPImage = downloadVEIPImage;
+}
+
+
+
+function downloadVEIPImage() {
+  if (!veipLastResult || !veipLastResult.success) {
+    if (typeof setStatus === 'function') setStatus('⚠ No hay resultados de VEIP para descargar');
+    return;
+  }
+  const r = veipLastResult;
+
+  // Crear un canvas HTML5 para renderizar el reporte gráfico
+  const W = 800;
+  const H = 540 + (r.detailTable.length * 36);
+  const cvs = document.createElement('canvas');
+  cvs.width = W * 2; // Retina 2x
+  cvs.height = H * 2;
+  const ctx = cvs.getContext('2d');
+  ctx.scale(2, 2);
+
+  // Fondo institucional oscuro
+  ctx.fillStyle = '#0f141c';
+  ctx.fillRect(0, 0, W, H);
+
+  // Borde exterior
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+
+  // Encabezado / Header
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 20px "Syne", sans-serif';
+  ctx.fillText('Valor Esperado de la Información Perfecta (VEIP)', 32, 48);
+
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = '12px "Syne", sans-serif';
+  ctx.fillText('DecisionTree Pro — Análisis de Investigación Operativa (Eppen / Hillier)', 32, 70);
+
+  // Separador
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(32, 85);
+  ctx.lineTo(W - 32, 85);
+  ctx.stroke();
+
+  // Tarjetas métricas (Grid 3x)
+  const cardW = (W - 64 - 24) / 3;
+  const cardY = 100;
+  const cardH = 80;
+
+  // 1. Tarjeta VEsIP
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32, cardY, cardW, cardH);
+  ctx.strokeStyle = '#2a3040';
+  ctx.strokeRect(32, cardY, cardW, cardH);
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 10px "Syne", sans-serif';
+  ctx.fillText('VESIP (SIN INFORMACIÓN)', 44, cardY + 22);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 20px "DM Mono", monospace';
+  ctx.fillText(fmt(r.vesip), 44, cardY + 52);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px "Syne", sans-serif';
+  ctx.fillText('Valor actual por Rollback', 44, cardY + 68);
+
+  // 2. Tarjeta VEcIP
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32 + cardW + 12, cardY, cardW, cardH);
+  ctx.strokeStyle = '#2a3040';
+  ctx.strokeRect(32 + cardW + 12, cardY, cardW, cardH);
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 10px "Syne", sans-serif';
+  ctx.fillText('VECIP (CON INF. PERFECTA)', 44 + cardW + 12, cardY + 22);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 20px "DM Mono", monospace';
+  ctx.fillText(fmt(r.vecip), 44 + cardW + 12, cardY + 52);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px "Syne", sans-serif';
+  ctx.fillText('Decisión óptima a posteriori', 44 + cardW + 12, cardY + 68);
+
+  // 3. Tarjeta VEIP (Destacada en Dorado)
+  ctx.fillStyle = 'rgba(245, 200, 66, 0.08)';
+  ctx.fillRect(32 + (cardW + 12) * 2, cardY, cardW, cardH);
+  ctx.strokeStyle = '#f5c842';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(32 + (cardW + 12) * 2, cardY, cardW, cardH);
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 10px "Syne", sans-serif';
+  ctx.fillText('VEIP (LÍMITE PRESUPUESTARIO)', 44 + (cardW + 12) * 2, cardY + 22);
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 22px "DM Mono", monospace';
+  ctx.fillText(fmt(r.veip), 44 + (cardW + 12) * 2, cardY + 52);
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '10px "Syne", sans-serif';
+  ctx.fillText('Tope máximo a pagar por datos', 44 + (cardW + 12) * 2, cardY + 68);
+
+  // Cuadro explicativo
+  const infoY = 196;
+  ctx.fillStyle = 'rgba(79, 142, 247, 0.08)';
+  ctx.fillRect(32, infoY, W - 64, 46);
+  ctx.strokeStyle = '#4f8ef7';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(32, infoY);
+  ctx.lineTo(32, infoY + 46);
+  ctx.stroke();
+
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '11.5px "Syne", sans-serif';
+  ctx.fillText('Conclusión Gerencial: Con información perfecta el rendimiento esperado asciende a ' + fmt(r.vecip) + '.', 44, infoY + 20);
+  ctx.fillText('El valor económico máximo que justifica encargar una investigación previa es de ' + fmt(r.veip) + '.', 44, infoY + 36);
+
+  // Tabla desglosada
+  const tblY = 260;
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32, tblY, W - 64, 28);
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(32, tblY, W - 64, 28);
+
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 10px "Syne", sans-serif';
+  ctx.fillText('ESTADO DE LA NATURALEZA', 44, tblY + 18);
+  ctx.fillText('PROB. P(θ)', 240, tblY + 18);
+  ctx.fillText('DECISIÓN ÓPTIMA', 360, tblY + 18);
+  ctx.fillText('PAGO ASOCIADO', 530, tblY + 18);
+  ctx.fillText('CONTRIBUCIÓN', 670, tblY + 18);
+
+  let currentY = tblY + 28;
+  r.detailTable.forEach((row, idx) => {
+    ctx.fillStyle = idx % 2 === 0 ? '#121721' : '#171d28';
+    ctx.fillRect(32, currentY, W - 64, 32);
+    ctx.strokeStyle = 'rgba(42, 48, 64, 0.5)';
+    ctx.strokeRect(32, currentY, W - 64, 32);
+
+    ctx.fillStyle = '#f1f5f9';
+    ctx.font = 'bold 11px "DM Mono", monospace';
+    ctx.fillText(row.state, 44, currentY + 20);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText((row.prob * 100).toFixed(1) + '%', 240, currentY + 20);
+
+    ctx.fillStyle = '#3BA2A4';
+    ctx.fillText('✔ ' + row.bestDecision, 360, currentY + 20);
+
+    ctx.fillStyle = '#f5c842';
+    ctx.fillText(fmt(row.bestPayoff), 530, currentY + 20);
+
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText(fmt(row.contribution), 670, currentY + 20);
+
+    currentY += 32;
+  });
+
+  // Fila Total
+  ctx.fillStyle = 'rgba(245, 200, 66, 0.08)';
+  ctx.fillRect(32, currentY, W - 64, 34);
+  ctx.strokeStyle = '#f5c842';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(32, currentY, W - 64, 34);
+
+  ctx.fillStyle = '#f5c842';
+  ctx.font = 'bold 11px "DM Mono", monospace';
+  ctx.fillText('TOTAL (VEcIP)', 44, currentY + 22);
+  ctx.fillText('100.0%', 240, currentY + 22);
+  ctx.fillText('—', 360, currentY + 22);
+  ctx.fillText('—', 530, currentY + 22);
+  ctx.fillStyle = '#a3e635';
+  ctx.font = 'bold 13px "DM Mono", monospace';
+  ctx.fillText(fmt(r.vecip), 670, currentY + 22);
+
+  // Pie de página
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px "Syne", sans-serif';
+  ctx.fillText('Generado automáticamente por DecisionTree Pro © AIGENOTECH — ' + (new Date()).toLocaleDateString(), 32, H - 24);
+
+  // Descarga del archivo PNG
+  const link = document.createElement('a');
+  link.download = 'VEIP_Reporte_' + (tree && tree.label ? tree.label.replace(/[^a-zA-Z0-9_-]/g, '_') : 'DecisionTree') + '.png';
+  link.href = cvs.toDataURL('image/png');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  if (typeof setStatus === 'function') {
+    setStatus('✔ Reporte gráfico de VEIP descargado como imagen PNG');
+  }
+}
