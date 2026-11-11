@@ -403,6 +403,7 @@ if (typeof window !== 'undefined') {
   window.calculateRollback = calcEV;
   window.solveTree = calcEV;
   window.calculateVEIP = calculateVEIP;
+  window.calculateVEIM = calculateVEIM;
 }
 
 // U(x) = 1 - e^(-x/R)  →  CE(nodo) = -R * ln(1 - U)
@@ -736,6 +737,41 @@ function calculateVEIP(rootNode, mode) {
     };
   }
 
+  // Caso especial: si rootNode es un nodo de azar directo con desenlaces terminales (ej. rama "Sin estudio")
+  if (rootNode.type === 'chance' && rootNode.children && rootNode.children.length > 0 && rootNode.children.every(c => c.type === 'terminal' || !c.children || c.children.length === 0)) {
+    const isMaxMode = (mode === 'max');
+    const vesipVal = (rootNode._ev !== undefined && rootNode._ev !== null) ? Number(rootNode._ev) : Number(rootNode.value || 0);
+    let vecipVal = 0;
+    const detailTbl = [];
+
+    for (const c of rootNode.children) {
+      const prob = (c.prob !== undefined && !isNaN(c.prob)) ? Number(c.prob) : 0;
+      const payoff = Number(c.value || 0);
+      const bestPayoff = isMaxMode ? Math.max(0, payoff) : Math.min(0, payoff);
+      const bestDecision = (bestPayoff === payoff) ? (c.label || c.id) : 'No participar';
+      const contrib = prob * bestPayoff;
+      vecipVal += contrib;
+      detailTbl.push({
+        state: c.label || c.id,
+        prob: prob,
+        bestDecision: bestDecision,
+        bestPayoff: bestPayoff,
+        contribution: contrib
+      });
+    }
+
+    const veipVal = Math.abs(vecipVal - vesipVal);
+    return {
+      success: true,
+      mode: mode,
+      vesip: vesipVal,
+      vecip: vecipVal,
+      veip: veipVal,
+      alternatives: [rootNode.label || 'Participar', 'No participar'],
+      detailTable: detailTbl
+    };
+  }
+
   // Identificar la decisión principal
   let decisionNode = null;
   if (rootNode.type === 'decision') {
@@ -960,6 +996,285 @@ function calculateVEIP(rootNode, mode) {
     veip: veip,
     alternatives: alternatives.map(a => a.label),
     detailTable: detailTable
+  };
+}
+
+
+// ═══════════════════════════════════════════════
+//  MÓDULO DE CÁLCULO DE VEIM (FEAT-03)
+//  Valor Esperado de la Información Muestral (EVSI)
+//  Marco Teórico: Eppen / Taha / Hillier
+// ═══════════════════════════════════════════════
+function calculateVEIM(rootNode, bayesMatrix, options) {
+  bayesMatrix = bayesMatrix || null;
+  options = options || { objective: 'max' };
+  const mode = (options && options.objective) ? options.objective : (typeof optimizeMode !== 'undefined' ? optimizeMode : 'max');
+  const isMax = (mode === 'max');
+
+  // CASO A: Cálculo a partir de matriz bayesiana directa
+  if (bayesMatrix && (bayesMatrix.veSinIM !== undefined || (bayesMatrix.priors && bayesMatrix.likelihoods && bayesMatrix.payoffs))) {
+    // Si viene directamente con VEconIM y VEsinIM (ej. caso sintético o prueba Eppen)
+    if (bayesMatrix.veConIM !== undefined && bayesMatrix.veSinIM !== undefined) {
+      const veConIM = Number(bayesMatrix.veConIM);
+      const veSinIM = Number(bayesMatrix.veSinIM);
+      const veim = Math.abs(veConIM - veSinIM);
+      const cost = (bayesMatrix.cost !== undefined && !isNaN(bayesMatrix.cost)) ? Number(bayesMatrix.cost) : 0;
+      const vnim = veim - cost;
+      const veip = (bayesMatrix.veip !== undefined && !isNaN(bayesMatrix.veip)) ? Number(bayesMatrix.veip) : null;
+      const efficiency = (veip !== null && veip > 0) ? (veim / veip) * 100 : 0;
+
+      return {
+        success: true,
+        mode: mode,
+        veSinIM: veSinIM,
+        veConIM: veConIM,
+        veim: veim,
+        cost: cost,
+        vnim: vnim,
+        isProfitable: (vnim > 0),
+        veip: veip,
+        efficiency: Number(efficiency.toFixed(2)),
+        sampleBreakdown: bayesMatrix.sampleBreakdown || []
+      };
+    }
+
+    const priors = bayesMatrix.priors;
+    const likelihoods = bayesMatrix.likelihoods;
+    const payoffs = bayesMatrix.payoffs;
+    const altLabels = bayesMatrix.alternatives || payoffs.map((_, i) => 'Alternativa ' + (i + 1));
+    const outcomeLabels = bayesMatrix.outcomes || likelihoods.map((_, k) => 'Resultado ' + (k + 1));
+
+    // VEsinIM = max_i( sum_j P(theta_j) * R_ij )
+    const evSinIMPerAlt = payoffs.map(row => row.reduce((sum, p, j) => sum + (priors[j] || 0) * p, 0));
+    const veSinIM = isMax ? Math.max(...evSinIMPerAlt) : Math.min(...evSinIMPerAlt);
+
+    let veConIM = 0;
+    const sampleBreakdown = [];
+
+    for (let k = 0; k < likelihoods.length; k++) {
+      const zLik = likelihoods[k];
+      const joints = priors.map((p, j) => (zLik[j] || 0) * p);
+      const marginalProb = joints.reduce((sum, jVal) => sum + jVal, 0);
+      const posteriors = marginalProb > 0 ? joints.map(jVal => jVal / marginalProb) : joints.map(() => 0);
+
+      let bestDecision = null;
+      let bestExpPayoff = isMax ? -Infinity : Infinity;
+
+      for (let i = 0; i < payoffs.length; i++) {
+        const altExp = payoffs[i].reduce((sum, p, j) => sum + posteriors[j] * p, 0);
+        if (isMax) {
+          if (altExp > bestExpPayoff) {
+            bestExpPayoff = altExp;
+            bestDecision = altLabels[i];
+          }
+        } else {
+          if (altExp < bestExpPayoff) {
+            bestExpPayoff = altExp;
+            bestDecision = altLabels[i];
+          }
+        }
+      }
+
+      if (bestDecision === null) {
+        bestDecision = '—';
+        bestExpPayoff = 0;
+      }
+
+      const weightedPayoff = marginalProb * bestExpPayoff;
+      veConIM += weightedPayoff;
+
+      sampleBreakdown.push({
+        outcome: outcomeLabels[k],
+        marginalProb: marginalProb,
+        bestDecision: bestDecision,
+        expectedPayoff: bestExpPayoff,
+        weightedPayoff: weightedPayoff
+      });
+    }
+
+    const veim = Math.abs(veConIM - veSinIM);
+    const studyCost = (bayesMatrix.cost !== undefined && !isNaN(bayesMatrix.cost)) ? Number(bayesMatrix.cost) : 0;
+    const vnim = veim - studyCost;
+
+    let veip = (typeof bayesMatrix.veip === 'number') ? bayesMatrix.veip : null;
+    if (veip === null) {
+      let vecip = 0;
+      for (let j = 0; j < priors.length; j++) {
+        let bestStatePayoff = isMax ? -Infinity : Infinity;
+        for (let i = 0; i < payoffs.length; i++) {
+          if (isMax) {
+            if (payoffs[i][j] > bestStatePayoff) bestStatePayoff = payoffs[i][j];
+          } else {
+            if (payoffs[i][j] < bestStatePayoff) bestStatePayoff = payoffs[i][j];
+          }
+        }
+        vecip += priors[j] * bestStatePayoff;
+      }
+      veip = Math.abs(vecip - veSinIM);
+    }
+
+    const efficiency = (veip !== null && veip > 0) ? (veim / veip) * 100 : 0;
+
+    return {
+      success: true,
+      mode: mode,
+      veSinIM: veSinIM,
+      veConIM: veConIM,
+      veim: veim,
+      cost: studyCost,
+      vnim: vnim,
+      isProfitable: (vnim > 0),
+      veip: veip,
+      efficiency: Number(efficiency.toFixed(2)),
+      sampleBreakdown: sampleBreakdown
+    };
+  }
+
+  // CASO B: Detección automática en el árbol jerárquico cargado
+  if (!rootNode) {
+    return {
+      success: false,
+      message: 'No hay un árbol de decisión disponible para calcular el VEIM.'
+    };
+  }
+
+  if (typeof calcEV === 'function') {
+    calcEV(rootNode);
+  }
+
+  if (rootNode.hasProbabilityError) {
+    return {
+      success: false,
+      message: 'El árbol contiene errores en las probabilidades de los nodos de azar.'
+    };
+  }
+
+  let decisionNode = null;
+  if (rootNode.type === 'decision') {
+    decisionNode = rootNode;
+  } else if (rootNode.type === 'chance' && rootNode.children) {
+    for (const c of rootNode.children) {
+      if (c.type === 'decision') {
+        decisionNode = c;
+        break;
+      }
+    }
+  }
+
+  if (!decisionNode || !decisionNode.children || decisionNode.children.length < 2) {
+    return {
+      success: false,
+      message: 'Para calcular el VEIM, el modelo debe contener una decisión inicial con al menos dos alternativas (con estudio / prueba vs sin estudio).'
+    };
+  }
+
+  // Identificar rama de estudio vs rama sin estudio
+  let sampleBranch = null;
+  let noSampleBranch = null;
+
+  for (const c of decisionNode.children) {
+    const lbl = (c.label || '').toLowerCase();
+    const hasSampleKeywords = lbl.includes('con estudio') || lbl.includes('estudio') || lbl.includes('muestra') || lbl.includes('prueba') || lbl.includes('test') || lbl.includes('investigación');
+    const hasNoSampleKeywords = lbl.includes('sin estudio') || lbl.includes('sin prueba') || lbl.includes('sin muestra') || lbl.includes('no realizar') || lbl.includes('no test');
+
+    if (hasNoSampleKeywords) {
+      noSampleBranch = c;
+    } else if (hasSampleKeywords && !sampleBranch) {
+      sampleBranch = c;
+    }
+  }
+
+  if (!sampleBranch || !noSampleBranch) {
+    const candidates = decisionNode.children.slice().sort((a, b) => {
+      const depthA = (a.children && a.children[0] && a.children[0].children) ? 2 : (a.children ? 1 : 0);
+      const depthB = (b.children && b.children[0] && b.children[0].children) ? 2 : (b.children ? 1 : 0);
+      return depthB - depthA;
+    });
+
+    if (candidates.length >= 2) {
+      sampleBranch = candidates[0];
+      noSampleBranch = candidates[1];
+    }
+  }
+
+  if (!sampleBranch || !noSampleBranch) {
+    return {
+      success: false,
+      message: 'No se pudo identificar la bifurcación de muestreo (Con Estudio vs Sin Estudio) en el árbol.'
+    };
+  }
+
+  // Costo del estudio
+  const branchCost = (sampleBranch.cost !== undefined && !isNaN(sampleBranch.cost)) ? Number(sampleBranch.cost) : 0;
+  const upfrontCost = (sampleBranch.value !== undefined && !isNaN(sampleBranch.value) && Number(sampleBranch.value) < 0) ? -Number(sampleBranch.value) : 0;
+  const studyCost = branchCost + upfrontCost;
+
+  // VEsinIM: Valor del subárbol sin estudio
+  const veSinIM = (noSampleBranch._ev !== undefined && noSampleBranch._ev !== null) ? Number(noSampleBranch._ev) : Number(noSampleBranch.value || 0);
+
+  // VEconIM: Valor bruto del subárbol de muestreo (sin deducir el costo del estudio)
+  const netSampleEV = (sampleBranch._ev !== undefined && sampleBranch._ev !== null) ? Number(sampleBranch._ev) : Number(sampleBranch.value || 0);
+  const veConIM = netSampleEV + studyCost;
+
+  const veim = Math.abs(veConIM - veSinIM);
+  const vnim = veim - studyCost;
+
+  // Desglose de resultados de la muestra (z_k)
+  const sampleBreakdown = [];
+  if (sampleBranch.children && sampleBranch.children.length > 0) {
+    for (const zk of sampleBranch.children) {
+      const outcomeLabel = zk.label || zk.id;
+      const marginalProb = (zk.prob !== undefined && !isNaN(zk.prob)) ? Number(zk.prob) : 0;
+      const zkVal = (zk._ev !== undefined && zk._ev !== null) ? Number(zk._ev) : Number(zk.value || 0);
+
+      let bestDecision = '—';
+      if (zk.children && zk.children.length > 0) {
+        if (zk.type === 'decision') {
+          const chosen = zk.children.find(ch => ch._isChosen || ch._optimal);
+          bestDecision = chosen ? (chosen.label || chosen.id) : (zk.children[0].label || zk.children[0].id);
+        } else {
+          bestDecision = zk.children[0].label || zk.children[0].id;
+        }
+      }
+
+      sampleBreakdown.push({
+        outcome: outcomeLabel,
+        marginalProb: marginalProb,
+        bestDecision: bestDecision,
+        expectedPayoff: zkVal,
+        weightedPayoff: marginalProb * zkVal
+      });
+    }
+  }
+
+  // Cálculo o inferencia del VEIP
+  let veip = null;
+  if (typeof calculateVEIP === 'function') {
+    const veipRes = calculateVEIP(noSampleBranch, mode);
+    if (veipRes && veipRes.success) {
+      veip = veipRes.veip;
+    } else {
+      const rootVeipRes = calculateVEIP(rootNode, mode);
+      if (rootVeipRes && rootVeipRes.success) veip = rootVeipRes.veip;
+    }
+  }
+
+  const efficiency = (veip !== null && veip > 0) ? (veim / veip) * 100 : null;
+
+  return {
+    success: true,
+    mode: mode,
+    sampleBranchLabel: sampleBranch.label,
+    noSampleBranchLabel: noSampleBranch.label,
+    veSinIM: veSinIM,
+    veConIM: veConIM,
+    veim: veim,
+    cost: studyCost,
+    vnim: vnim,
+    isProfitable: (vnim > 0),
+    veip: veip,
+    efficiency: efficiency !== null ? Number(efficiency.toFixed(2)) : null,
+    sampleBreakdown: sampleBreakdown
   };
 }
 

@@ -2257,3 +2257,406 @@ function downloadVEIPImage() {
     setStatus('✔ Reporte gráfico de VEIP descargado como imagen PNG');
   }
 }
+
+
+
+// ═══════════════════════════════════════════════
+//  MÓDULO DE INTERFAZ VEIM (FEAT-03)
+// ═══════════════════════════════════════════════
+let veimLastResult = null;
+
+function openVEIM() {
+  if (!tree) {
+    if (typeof setStatus === 'function') setStatus('⚠ Carga un árbol de decisión primero');
+    return;
+  }
+
+  // Ejecutar cálculo automático de VEIM
+  if (typeof calculateVEIM === 'function') {
+    veimLastResult = calculateVEIM(tree, null, { objective: optimizeMode });
+    renderVEIMModal(veimLastResult);
+  }
+
+  const modal = document.getElementById('modal-veim');
+  if (modal) {
+    modal.classList.add('open');
+  } else {
+    const valModal = document.getElementById('modal-value-info');
+    if (valModal) {
+      valModal.classList.add('open');
+      if (typeof switchValueInfoTab === 'function') switchValueInfoTab('veim');
+    }
+  }
+}
+
+function closeVEIM() {
+  const modal = document.getElementById('modal-veim');
+  if (modal) modal.classList.remove('open');
+  const valModal = document.getElementById('modal-value-info');
+  if (valModal) valModal.classList.remove('open');
+}
+
+function renderVEIMModal(res) {
+  const container = document.getElementById('veim-modal-body');
+  if (!container) return;
+
+  if (!res || !res.success) {
+    container.innerHTML = `
+      <div class="veip-alert-box">
+        <strong>Estructura no compatible:</strong> ${res && res.message ? res.message : 'No se pudo calcular el VEIM para el modelo actual.'}
+      </div>
+      <div class="value-info-formula-card" style="margin-top:10px">
+        <div class="formula-label">REQUISITOS METODOLÓGICOS (Eppen / Taha):</div>
+        <div class="formula-sub">
+          El árbol debe representar una decisión que compare una alternativa con estudio/muestra (cuyas ramas intermedias representen los resultados del test con sus probabilidades marginales y decisiones posteriores) frente a una alternativa sin estudio (decisión con probabilidades a priori).
+        </div>
+      </div>
+    `;
+    const btnDownload = document.getElementById('veim-btn-download');
+    if (btnDownload) btnDownload.style.display = 'none';
+    return;
+  }
+
+  const btnDownload = document.getElementById('veim-btn-download');
+  if (btnDownload) btnDownload.style.display = 'inline-block';
+
+  let tableRows = '';
+  if (res.sampleBreakdown && res.sampleBreakdown.length > 0) {
+    res.sampleBreakdown.forEach(row => {
+      tableRows += `
+        <tr>
+          <td><strong>${escXml(row.outcome)}</strong></td>
+          <td>${(row.marginalProb * 100).toFixed(1)}% <span style="color:var(--muted)">(${row.marginalProb.toFixed(3)})</span></td>
+          <td class="best-decision">✔ ${escXml(row.bestDecision)}</td>
+          <td class="best-payoff">${fmt(row.expectedPayoff)}</td>
+          <td class="contrib">${fmt(row.weightedPayoff)}</td>
+        </tr>
+      `;
+    });
+  }
+
+  const efficiencyDisplay = (res.efficiency !== null && res.efficiency !== undefined)
+    ? res.efficiency.toFixed(1) + '%'
+    : 'N/A';
+
+  const isProfitable = res.isProfitable;
+  const viabilityHtml = isProfitable
+    ? `<div class="veim-viability-box profitable">
+        <strong>✔ Estudio Económicamente Recomendado:</strong> El beneficio bruto del estudio es <strong>${fmt(res.veim)}</strong> frente a un costo de <strong>${fmt(res.cost)}</strong>. Aporta un <strong>Valor Neto de Información Muestral (VNIM) de ${fmt(res.vnim)}</strong>.
+       </div>`
+    : `<div class="veim-viability-box unprofitable">
+        <strong>⚠ Estudio No Recomendado:</strong> El costo del estudio (<strong>${fmt(res.cost)}</strong>) supera su valor bruto generado (<strong>${fmt(res.veim)}</strong>). Se obtendría un <strong>VNIM negativo de ${fmt(res.vnim)}</strong>.
+       </div>`;
+
+  container.innerHTML = `
+    <div class="veim-grid">
+      <div class="veim-card">
+        <span class="veim-card-label">VE sin Muestra</span>
+        <span class="veim-card-val">${fmt(res.veSinIM)}</span>
+        <span class="veim-card-sub">Decisión con priori</span>
+      </div>
+      <div class="veim-card">
+        <span class="veim-card-label">VE con Muestra (Bruto)</span>
+        <span class="veim-card-val">${fmt(res.veConIM)}</span>
+        <span class="veim-card-sub">Sin restar costo del test</span>
+      </div>
+      <div class="veim-card highlight">
+        <span class="veim-card-label">VEIM (Valor Bruto)</span>
+        <span class="veim-card-val">${fmt(res.veim)}</span>
+        <span class="veim-card-sub">Ganancia por muestreo</span>
+      </div>
+      <div class="veim-card efficiency">
+        <span class="veim-card-label">Eficiencia (E)</span>
+        <span class="veim-card-val">${efficiencyDisplay}</span>
+        <span class="veim-card-sub">${res.veip ? 'VEIM / VEIP (' + fmt(res.veip) + ')' : 'Relativo al VEIP'}</span>
+      </div>
+    </div>
+
+    ${viabilityHtml}
+
+    <div class="veip-table-container">
+      <table class="veip-table">
+        <thead>
+          <tr>
+            <th>Resultado Muestral (zₖ)</th>
+            <th>Prob. Marginal P(z)</th>
+            <th>Decisión Posterior</th>
+            <th>Valor Esperado</th>
+            <th>Contribución Ponderada</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          <tr class="total-row">
+            <td><strong>TOTAL (VEconIM Bruto)</strong></td>
+            <td><strong>100.0%</strong></td>
+            <td>—</td>
+            <td>—</td>
+            <td class="contrib" style="font-size:12px">${fmt(res.veConIM)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function downloadVEIMImage() {
+  if (!veimLastResult || !veimLastResult.success) {
+    if (typeof setStatus === 'function') setStatus('⚠ No hay resultados de VEIM para descargar');
+    return;
+  }
+  const r = veimLastResult;
+
+  const W = 840;
+  const H = 560 + (r.sampleBreakdown.length * 36);
+  const cvs = document.createElement('canvas');
+  cvs.width = W * 2;
+  cvs.height = H * 2;
+  const ctx = cvs.getContext('2d');
+  ctx.scale(2, 2);
+
+  // Fondo oscuro
+  ctx.fillStyle = '#0f141c';
+  ctx.fillRect(0, 0, W, H);
+
+  // Borde
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(10, 10, W - 20, H - 20);
+
+  // Encabezado
+  ctx.fillStyle = '#3BA2A4';
+  ctx.font = 'bold 20px "Syne", sans-serif';
+  ctx.fillText('Valor Esperado de la Información Muestral (VEIM / EVSI)', 32, 48);
+
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = '12px "Syne", sans-serif';
+  ctx.fillText('DecisionTree Pro — Análisis de Información Muestral y Eficiencia (Eppen / Taha)', 32, 70);
+
+  // Separador
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(32, 85);
+  ctx.lineTo(W - 32, 85);
+  ctx.stroke();
+
+  // Grid de 4 tarjetas
+  const cardW = (W - 64 - 36) / 4;
+  const cardY = 100;
+  const cardH = 80;
+
+  // 1. VEsinIM
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32, cardY, cardW, cardH);
+  ctx.strokeStyle = '#2a3040';
+  ctx.strokeRect(32, cardY, cardW, cardH);
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 9.5px "Syne", sans-serif';
+  ctx.fillText('VE SIN MUESTRA', 42, cardY + 22);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 18px "DM Mono", monospace';
+  ctx.fillText(fmt(r.veSinIM), 42, cardY + 52);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '9px "Syne", sans-serif';
+  ctx.fillText('Decisión con priori', 42, cardY + 68);
+
+  // 2. VEconIM
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32 + cardW + 12, cardY, cardW, cardH);
+  ctx.strokeStyle = '#2a3040';
+  ctx.strokeRect(32 + cardW + 12, cardY, cardW, cardH);
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 9.5px "Syne", sans-serif';
+  ctx.fillText('VE CON MUESTRA (BRUTO)', 42 + cardW + 12, cardY + 22);
+  ctx.fillStyle = '#e2e8f0';
+  ctx.font = 'bold 18px "DM Mono", monospace';
+  ctx.fillText(fmt(r.veConIM), 42 + cardW + 12, cardY + 52);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '9px "Syne", sans-serif';
+  ctx.fillText('Sin descontar costo', 42 + cardW + 12, cardY + 68);
+
+  // 3. VEIM (Destacada)
+  ctx.fillStyle = 'rgba(59, 162, 164, 0.1)';
+  ctx.fillRect(32 + (cardW + 12) * 2, cardY, cardW, cardH);
+  ctx.strokeStyle = '#3BA2A4';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(32 + (cardW + 12) * 2, cardY, cardW, cardH);
+  ctx.fillStyle = '#3BA2A4';
+  ctx.font = 'bold 9.5px "Syne", sans-serif';
+  ctx.fillText('VEIM (VALOR BRUTO)', 42 + (cardW + 12) * 2, cardY + 22);
+  ctx.fillStyle = '#3BA2A4';
+  ctx.font = 'bold 20px "DM Mono", monospace';
+  ctx.fillText(fmt(r.veim), 42 + (cardW + 12) * 2, cardY + 52);
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '9px "Syne", sans-serif';
+  ctx.fillText('Beneficio del estudio', 42 + (cardW + 12) * 2, cardY + 68);
+
+  // 4. Eficiencia
+  ctx.fillStyle = 'rgba(163, 230, 53, 0.08)';
+  ctx.fillRect(32 + (cardW + 12) * 3, cardY, cardW, cardH);
+  ctx.strokeStyle = '#a3e635';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(32 + (cardW + 12) * 3, cardY, cardW, cardH);
+  ctx.fillStyle = '#a3e635';
+  ctx.font = 'bold 9.5px "Syne", sans-serif';
+  ctx.fillText('EFICIENCIA (E)', 42 + (cardW + 12) * 3, cardY + 22);
+  ctx.fillStyle = '#a3e635';
+  ctx.font = 'bold 20px "DM Mono", monospace';
+  ctx.fillText(r.efficiency !== null ? r.efficiency.toFixed(1) + '%' : 'N/A', 42 + (cardW + 12) * 3, cardY + 52);
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = '9px "Syne", sans-serif';
+  ctx.fillText(r.veip ? 'Tope VEIP: ' + fmt(r.veip) : 'Relativo al VEIP', 42 + (cardW + 12) * 3, cardY + 68);
+
+  // Recuadro de viabilidad económica
+  const infoY = 196;
+  const isProf = r.isProfitable;
+  ctx.fillStyle = isProf ? 'rgba(163, 230, 53, 0.08)' : 'rgba(239, 68, 68, 0.08)';
+  ctx.fillRect(32, infoY, W - 64, 46);
+  ctx.strokeStyle = isProf ? '#a3e635' : '#ef4444';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(32, infoY);
+  ctx.lineTo(32, infoY + 46);
+  ctx.stroke();
+
+  ctx.fillStyle = '#f1f5f9';
+  ctx.font = 'bold 11px "Syne", sans-serif';
+  ctx.fillText(isProf ? '✔ Estudio Viable y Recomendado:' : '⚠ Estudio No Rentable:', 44, infoY + 20);
+  ctx.font = '11px "Syne", sans-serif';
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillText('VEIM = ' + fmt(r.veim) + ' | Costo = ' + fmt(r.cost) + ' | Valor Neto (VNIM) = ' + fmt(r.vnim) + (r.efficiency ? ' | Eficiencia = ' + r.efficiency.toFixed(1) + '%' : ''), 44, infoY + 36);
+
+  // Tabla desglosada
+  const tblY = 260;
+  ctx.fillStyle = '#171d28';
+  ctx.fillRect(32, tblY, W - 64, 28);
+  ctx.strokeStyle = '#2a3040';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(32, tblY, W - 64, 28);
+
+  ctx.fillStyle = '#8b9bb4';
+  ctx.font = 'bold 10px "Syne", sans-serif';
+  ctx.fillText('RESULTADO MUESTRAL (zₖ)', 44, tblY + 18);
+  ctx.fillText('PROB. MARGINAL P(z)', 260, tblY + 18);
+  ctx.fillText('DECISIÓN POSTERIOR', 400, tblY + 18);
+  ctx.fillText('VALOR ESPERADO', 570, tblY + 18);
+  ctx.fillText('CONTRIBUCIÓN', 710, tblY + 18);
+
+  let currentY = tblY + 28;
+  r.sampleBreakdown.forEach((row, idx) => {
+    ctx.fillStyle = idx % 2 === 0 ? '#121721' : '#171d28';
+    ctx.fillRect(32, currentY, W - 64, 32);
+    ctx.strokeStyle = 'rgba(42, 48, 64, 0.5)';
+    ctx.strokeRect(32, currentY, W - 64, 32);
+
+    ctx.fillStyle = '#f1f5f9';
+    ctx.font = 'bold 11px "DM Mono", monospace';
+    ctx.fillText(row.outcome, 44, currentY + 20);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.fillText((row.marginalProb * 100).toFixed(1) + '%', 260, currentY + 20);
+
+    ctx.fillStyle = '#3BA2A4';
+    ctx.fillText('✔ ' + row.bestDecision, 400, currentY + 20);
+
+    ctx.fillStyle = '#f5c842';
+    ctx.fillText(fmt(row.expectedPayoff), 570, currentY + 20);
+
+    ctx.fillStyle = '#a3e635';
+    ctx.fillText(fmt(row.weightedPayoff), 710, currentY + 20);
+
+    currentY += 32;
+  });
+
+  // Fila Total
+  ctx.fillStyle = 'rgba(59, 162, 164, 0.08)';
+  ctx.fillRect(32, currentY, W - 64, 34);
+  ctx.strokeStyle = '#3BA2A4';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(32, currentY, W - 64, 34);
+
+  ctx.fillStyle = '#3BA2A4';
+  ctx.font = 'bold 11px "DM Mono", monospace';
+  ctx.fillText('TOTAL (VEconIM Bruto)', 44, currentY + 22);
+  ctx.fillText('100.0%', 260, currentY + 22);
+  ctx.fillText('—', 400, currentY + 22);
+  ctx.fillText('—', 570, currentY + 22);
+  ctx.fillStyle = '#a3e635';
+  ctx.font = 'bold 13px "DM Mono", monospace';
+  ctx.fillText(fmt(r.veConIM), 710, currentY + 22);
+
+  // Pie de página
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px "Syne", sans-serif';
+  ctx.fillText('Generado automáticamente por DecisionTree Pro © AIGENOTECH — ' + (new Date()).toLocaleDateString(), 32, H - 24);
+
+  const link = document.createElement('a');
+  link.download = 'VEIM_Reporte_' + (tree && tree.label ? tree.label.replace(/[^a-zA-Z0-9_-]/g, '_') : 'DecisionTree') + '.png';
+  link.href = cvs.toDataURL('image/png');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  if (typeof setStatus === 'function') {
+    setStatus('✔ Reporte gráfico de VEIM descargado como imagen PNG');
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.openVEIM = openVEIM;
+  window.closeVEIM = closeVEIM;
+  window.renderVEIMModal = renderVEIMModal;
+  window.downloadVEIMImage = downloadVEIMImage;
+}
+
+
+
+// Control de retorno entre modal de marco teórico y modales de cálculo
+let valueInfoReturnOrigin = null;
+
+function updateReturnButton(origin) {
+  const btnReturn = document.getElementById('btn-return-value-info');
+  if (!btnReturn) return;
+
+  if (origin === 'veip' || origin === 'veim') {
+    valueInfoReturnOrigin = origin;
+    btnReturn.style.display = 'inline-flex';
+    btnReturn.textContent = origin === 'veip' ? '← Volver a VEIP' : '← Volver a VEIM';
+  } else {
+    valueInfoReturnOrigin = null;
+    btnReturn.style.display = 'none';
+  }
+}
+
+function showTheoryFrom(origin) {
+  valueInfoReturnOrigin = origin; // 'veip' | 'veim'
+  if (origin === 'veip' && typeof closeVEIP === 'function') closeVEIP();
+  if (origin === 'veim' && typeof closeVEIM === 'function') closeVEIM();
+
+  if (typeof openValueInfoModal === 'function') {
+    openValueInfoModal(origin);
+  }
+
+  updateReturnButton(origin);
+}
+
+function returnFromValueInfo() {
+  const origin = valueInfoReturnOrigin;
+  if (typeof closeValueInfoModal === 'function') closeValueInfoModal();
+
+  if (origin === 'veip' && typeof openVEIP === 'function') {
+    openVEIP();
+  } else if (origin === 'veim' && typeof openVEIM === 'function') {
+    openVEIM();
+  }
+  valueInfoReturnOrigin = null;
+  const btnReturn = document.getElementById('btn-return-value-info');
+  if (btnReturn) btnReturn.style.display = 'none';
+}
+
+if (typeof window !== 'undefined') {
+  window.showTheoryFrom = showTheoryFrom;
+  window.returnFromValueInfo = returnFromValueInfo;
+  window.updateReturnButton = updateReturnButton;
+}
