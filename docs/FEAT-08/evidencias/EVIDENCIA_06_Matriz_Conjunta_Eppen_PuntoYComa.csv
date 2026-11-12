@@ -1,0 +1,4 @@
+﻿ID_Estado;Estado_Naturaleza;Probabilidad_Priori
+θ1;θ1 (Demanda Alta);0.6
+θ2;θ2 (Demanda Baja);0.4
+Total;—;1

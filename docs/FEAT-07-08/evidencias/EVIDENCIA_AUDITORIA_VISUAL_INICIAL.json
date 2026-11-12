@@ -1,0 +1,201 @@
+{
+  "title": "Auditoría Visual y Técnica del Módulo Bayesiano (DecisionTree Pro)",
+  "timestamp": "2026-11-12T04:42:11.774Z",
+  "findings": [
+    {
+      "id": "BUG-UI-01",
+      "name": "Etiquetas cortadas en matriz de verosimilitudes",
+      "evidence": [
+        {
+          "index": 0,
+          "value": "z1 (Estudio Favorable)",
+          "textLength": 22,
+          "inlineWidth": "80px",
+          "offsetWidth": 80,
+          "scrollWidth": 105,
+          "isTruncated": true
+        },
+        {
+          "index": 1,
+          "value": "z2 (Estudio Desfavorable)",
+          "textLength": 25,
+          "inlineWidth": "80px",
+          "offsetWidth": 80,
+          "scrollWidth": 123,
+          "isTruncated": true
+        }
+      ],
+      "rootCause": "El atributo inline style=\"width:80px\" fuerza un ancho fijo de 80px en inputs donde la etiqueta mide más de 20 caracteres (~160px), provocando recorte de texto (scrollWidth > clientWidth)."
+    },
+    {
+      "id": "BUG-UI-02",
+      "name": "Etiqueta matemática de normalización y notación",
+      "evidence": {
+        "sumLabel": "Σ P(z|θ)",
+        "secTitle": "Evidencia y verosimilitudes P(E|Hᵢ)",
+        "subTitle": "Teorema de Bayes — P(Hᵢ|E) = P(E|Hᵢ)·P(Hᵢ) / P(E)"
+      },
+      "rootCause": "El texto de la fila sumatoria es \"Σ P(z|θ)\" y el título de sección es \"Evidencia y verosimilitudes P(E|Hᵢ)\", usando notación mixta E/H en lugar de la notación formal canónica de Eppen: P(zⱼ | θᵢ) y sumatoria Σⱼ P(zⱼ | θᵢ) = 1.0 por columna de estado."
+    },
+    {
+      "id": "BUG-UI-03",
+      "name": "Distribución del contenido del modal y pérdida de header al scroll",
+      "evidence": {
+        "modalHeight": 727,
+        "modalScrollHeight": 1771,
+        "isScrollable": true,
+        "titlePosition": "static",
+        "toolbarDisplay": "flex",
+        "pillsCount": 6,
+        "actionsWrap": "wrap"
+      },
+      "rootCause": "El modal tiene overflow-y: auto en su contenedor principal pero .bayes-title no posee position: sticky ni header desacoplado. Al desplazarse verticalmente hacia las tablas de resultados, el encabezado y el botón de cierre (✕) desaparecen de la vista."
+    }
+  ],
+  "responsiveAudits": [
+    {
+      "resolution": "1920x1080 (Desktop Full HD)",
+      "width": 1920,
+      "height": 1080,
+      "metrics": {
+        "viewportW": 1920,
+        "viewportH": 1080,
+        "modalW": 780,
+        "modalH": 972,
+        "toolbarW": 723,
+        "pillsW": 613,
+        "actionsW": 693,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "screenshot": "AUDIT_RESP_1920x1080.png"
+    },
+    {
+      "resolution": "1366x768 (Laptop Estándar)",
+      "width": 1366,
+      "height": 768,
+      "metrics": {
+        "viewportW": 1366,
+        "viewportH": 768,
+        "modalW": 780,
+        "modalH": 691,
+        "toolbarW": 723,
+        "pillsW": 613,
+        "actionsW": 693,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "screenshot": "AUDIT_RESP_1366x768.png"
+    },
+    {
+      "resolution": "1024x768 (Tablet Landscape / Laptop XGA)",
+      "width": 1024,
+      "height": 768,
+      "metrics": {
+        "viewportW": 1024,
+        "viewportH": 768,
+        "modalW": 780,
+        "modalH": 691,
+        "toolbarW": 723,
+        "pillsW": 613,
+        "actionsW": 693,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "screenshot": "AUDIT_RESP_1024x768.png"
+    },
+    {
+      "resolution": "768x1024 (Tablet Portrait)",
+      "width": 768,
+      "height": 1024,
+      "metrics": {
+        "viewportW": 768,
+        "viewportH": 1024,
+        "modalW": 730,
+        "modalH": 922,
+        "toolbarW": 673,
+        "pillsW": 613,
+        "actionsW": 643,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          false,
+          false,
+          false,
+          false,
+          false
+        ]
+      },
+      "screenshot": "AUDIT_RESP_768x1024.png"
+    },
+    {
+      "resolution": "390x844 (Mobile iPhone 12-15)",
+      "width": 390,
+      "height": 844,
+      "metrics": {
+        "viewportW": 643,
+        "viewportH": 1392,
+        "modalW": 371,
+        "modalH": 760,
+        "toolbarW": 329,
+        "pillsW": 299,
+        "actionsW": 299,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "screenshot": "AUDIT_RESP_390x844.png"
+    },
+    {
+      "resolution": "360x740 (Mobile Android Compact)",
+      "width": 360,
+      "height": 740,
+      "metrics": {
+        "viewportW": 643,
+        "viewportH": 1322,
+        "modalW": 342,
+        "modalH": 666,
+        "toolbarW": 300,
+        "pillsW": 270,
+        "actionsW": 270,
+        "tablesCount": 6,
+        "tableOverflows": [
+          false,
+          true,
+          true,
+          true,
+          true,
+          true
+        ]
+      },
+      "screenshot": "AUDIT_RESP_360x740.png"
+    }
+  ]
+}

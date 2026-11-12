@@ -1,0 +1,158 @@
+{
+  "timestamp": "2026-11-12T02:34:16.750Z",
+  "tests": [
+    {
+      "id": "TEST-MATH-01",
+      "name": "Validación de probabilidades conjuntas en fixture Eppen (ΣΣ=1.0000)",
+      "ac": "FEAT-07-AC-01",
+      "status": "PASS",
+      "details": {
+        "success": true,
+        "totalJointSum": 1,
+        "joint_00": 0.48,
+        "joint_01": 0.12,
+        "joint_10": 0.12,
+        "joint_11": 0.27999999999999997
+      }
+    },
+    {
+      "id": "TEST-MATH-02",
+      "name": "Cálculo y normalización de marginales P(z1)=0.60, P(z2)=0.40",
+      "ac": "FEAT-07-AC-02",
+      "status": "PASS",
+      "details": {
+        "success": true,
+        "marginal_z1": 0.6,
+        "marginal_z2": 0.39999999999999997,
+        "totalMarginalSum": 1
+      }
+    },
+    {
+      "id": "TEST-MATH-03",
+      "name": "Posteriores para señal z1 P(θ|z1)=[0.80, 0.20] con suma 1.0000",
+      "ac": "FEAT-07-AC-03",
+      "status": "PASS",
+      "details": {
+        "success": true,
+        "post_theta1_z1": 0.8,
+        "post_theta2_z1": 0.2,
+        "sum": 1,
+        "isPossible": true
+      }
+    },
+    {
+      "id": "TEST-MATH-04",
+      "name": "Posteriores para señal z2 P(θ|z2)=[0.30, 0.70] con suma 1.0000",
+      "ac": "FEAT-07-AC-03",
+      "status": "PASS",
+      "details": {
+        "success": true,
+        "post_theta1_z2": 0.3,
+        "post_theta2_z2": 0.7,
+        "sum": 1,
+        "isPossible": true
+      }
+    },
+    {
+      "id": "TEST-EDGE-05",
+      "name": "Marginal cero P(z)=0 marcado como evento imposible sin NaN/Infinity",
+      "ac": "FEAT-07-AC-03",
+      "status": "PASS",
+      "details": {
+        "success": true,
+        "marginal": 0,
+        "isPossible": false,
+        "isDefined": false,
+        "dist": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "id": "TEST-NEG-06",
+      "name": "Rechazo de probabilidades a priori que no suman 1.000",
+      "ac": "FEAT-07-AC-01",
+      "status": "PASS",
+      "details": {
+        "success": false,
+        "error": "Las probabilidades a priori suman 1.2000 — deben sumar estrictamente 1.000."
+      }
+    },
+    {
+      "id": "TEST-NEG-07",
+      "name": "Rechazo de verosimilitudes condicionales que no suman 1.0 por estado",
+      "ac": "FEAT-07-AC-01",
+      "status": "PASS",
+      "details": {
+        "success": false,
+        "error": "Las verosimilitudes para el estado θ1 suman 1.8000 — deben sumar 1.000 (Σ_j P(z_j|θ_1) = 1.0)."
+      }
+    },
+    {
+      "id": "TEST-NEG-08",
+      "name": "Rechazo de probabilidades fuera del rango [0, 1]",
+      "ac": "FEAT-07-AC-04",
+      "status": "PASS",
+      "details": {
+        "success": false,
+        "error": "La probabilidad a priori P(θ1) = -0.2 debe encontrarse en el intervalo [0.000, 1.000]."
+      }
+    },
+    {
+      "id": "TEST-CHANCE-09",
+      "name": "Normalización de nodos de azar en árbol (Σ P(rama)=1.00)",
+      "ac": "FEAT-07-AC-04",
+      "status": "PASS",
+      "details": {
+        "validChanceOk": true,
+        "invalidChanceDetected": true,
+        "sum2": 1.2
+      }
+    },
+    {
+      "id": "TEST-INTEG-10",
+      "name": "Renderizado interactivo de Matriz de Eppen y tablas en modal",
+      "ac": "FEAT-07-AC-01",
+      "status": "PASS",
+      "details": {
+        "overlayOpen": true,
+        "sectionVisible": true,
+        "hasEppenMatrix": true,
+        "hasAC01Badge": true,
+        "hasAC02Badge": true,
+        "hasAC03Badge": true,
+        "noWarn": true
+      }
+    },
+    {
+      "id": "TEST-INTEG-11",
+      "name": "Transferencia de probabilidades posteriores al nodo de azar C1 en el lienzo",
+      "ac": "FEAT-07-AC-04",
+      "status": "PASS",
+      "details": {
+        "selectedIsC1": true,
+        "childCount": 2,
+        "branch1_prob": 0.8,
+        "branch2_prob": 0.2,
+        "branch1_label": "θ1 (Demanda Alta) | z1 (Estudio Favorable)",
+        "branch1_probLabel": "posterior",
+        "valid": true,
+        "treeEv": 116000
+      }
+    },
+    {
+      "id": "TEST-ERR-12",
+      "name": "Monitoreo de excepciones en Runtime de Edge Headless CDP",
+      "ac": "Calidad",
+      "status": "PASS",
+      "details": {
+        "consoleErrorsCount": 0,
+        "errors": []
+      }
+    }
+  ],
+  "passedCount": 12,
+  "failedCount": 0,
+  "totalCount": 12
+}

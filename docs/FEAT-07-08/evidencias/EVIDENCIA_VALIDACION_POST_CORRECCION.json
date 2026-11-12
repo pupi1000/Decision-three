@@ -1,0 +1,187 @@
+{
+  "title": "Validación Funcional y Visual del Módulo Bayesiano Post-Corrección",
+  "timestamp": "2026-11-12T04:44:43.562Z",
+  "tests": [
+    {
+      "id": "BUG-UI-01",
+      "name": "Visualización íntegra de etiquetas de señales informativas",
+      "expected": "isTruncated: false, offsetWidth >= 150px, contenedor responsivo presente",
+      "actual": {
+        "inputs": [
+          {
+            "index": 0,
+            "value": "z1 (Estudio Favorable)",
+            "offsetWidth": 313,
+            "scrollWidth": 313,
+            "clientWidth": 313,
+            "isTruncated": false,
+            "hasResponsiveContainer": true
+          },
+          {
+            "index": 1,
+            "value": "z2 (Estudio Desfavorable)",
+            "offsetWidth": 313,
+            "scrollWidth": 313,
+            "clientWidth": 313,
+            "isTruncated": false,
+            "hasResponsiveContainer": true
+          }
+        ],
+        "allVisible": true
+      },
+      "passed": true
+    },
+    {
+      "id": "BUG-UI-02",
+      "name": "Notación matemática formal de Eppen y normalización condicional",
+      "expected": "Σⱼ P(zⱼ | θᵢ) = 1.0 por columna, P(zⱼ | θᵢ) en título, sumas = 1.000",
+      "actual": {
+        "sumCell": "Σⱼ P(zⱼ | θᵢ) = 1.0",
+        "subTitle": "Teorema de Bayes (Información Imperfecta de Eppen) — P(θᵢ | zⱼ) = P(θᵢ) · P(zⱼ | θᵢ) / P(zⱼ)",
+        "sec2Title": "2. Señales Informativas y Verosimilitudes P(zⱼ | θᵢ)",
+        "col0Sum": "1.000",
+        "col1Sum": "1.000",
+        "mathValid": true,
+        "notationCorrect": true
+      },
+      "passed": true
+    },
+    {
+      "id": "BUG-UI-03",
+      "name": "Permanencia del encabezado adhesivo y botón de cierre al scroll",
+      "expected": "Encabezado y botón ✕ visibles en el viewport superior al desplazarse",
+      "actual": {
+        "scrollTop": 500,
+        "headerTop": 41.40625,
+        "modalTop": 40.40625,
+        "isHeaderVisible": true,
+        "isCloseBtnVisible": true
+      },
+      "passed": true
+    },
+    {
+      "id": "BUG-UI-04",
+      "name": "Distribución ergonómica de botones y alternancia de vistas",
+      "expected": "Toolbar adaptable, 6 pills funcionales, contenedor de acciones",
+      "actual": {
+        "hasToolbar": true,
+        "pillsCount": 6,
+        "hasActionBtnsContainer": true,
+        "hasSepSelect": true,
+        "pillsWorks": true
+      },
+      "passed": true
+    },
+    {
+      "id": "REGRESSION-TEST",
+      "name": "Comprobación de no regresión en exportación CSV, TSV y XLSX",
+      "expected": "5 matrices intactas, TSV con tabulaciones, CSV con BOM, XLSX > 5KB",
+      "actual": {
+        "has5Matrices": true,
+        "tsvValid": true,
+        "csvValid": true,
+        "xlsxValid": true
+      },
+      "passed": true
+    }
+  ],
+  "responsiveTests": [
+    {
+      "resolution": "1920x1080 (Desktop Full HD)",
+      "width": 1920,
+      "height": 1080,
+      "metrics": {
+        "viewportW": 1920,
+        "modalW": 780,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_1920x1080.png",
+      "passed": true
+    },
+    {
+      "resolution": "1366x768 (Laptop Estándar)",
+      "width": 1366,
+      "height": 768,
+      "metrics": {
+        "viewportW": 1366,
+        "modalW": 780,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_1366x768.png",
+      "passed": true
+    },
+    {
+      "resolution": "1024x768 (Tablet Landscape)",
+      "width": 1024,
+      "height": 768,
+      "metrics": {
+        "viewportW": 1024,
+        "modalW": 780,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_1024x768.png",
+      "passed": true
+    },
+    {
+      "resolution": "768x1024 (Tablet Portrait)",
+      "width": 768,
+      "height": 1024,
+      "metrics": {
+        "viewportW": 768,
+        "modalW": 730,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_768x1024.png",
+      "passed": true
+    },
+    {
+      "resolution": "390x844 (Mobile iPhone 12-15)",
+      "width": 390,
+      "height": 844,
+      "metrics": {
+        "viewportW": 643,
+        "modalW": 371,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_390x844.png",
+      "passed": true
+    },
+    {
+      "resolution": "360x740 (Mobile Android Compact)",
+      "width": 360,
+      "height": 740,
+      "metrics": {
+        "viewportW": 643,
+        "modalW": 342,
+        "modalFits": true,
+        "headerVisible": true,
+        "closeBtnAccessible": true,
+        "tablesCount": 7,
+        "allTablesResponsive": true
+      },
+      "screenshot": "POST_RESP_360x740.png",
+      "passed": true
+    }
+  ],
+  "overallStatus": "PASSED"
+}

@@ -928,17 +928,29 @@ body.presentation-mode .presentation-exit { display: block; }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
-  width: 540px;
+  width: 780px;
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+.bayes-header-sticky {
+  position: sticky;
+  top: -20px;
+  background: var(--surface2);
+  padding: 16px 20px 10px 20px;
+  margin: -20px -20px 14px -20px;
+  z-index: 40;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .bayes-title {
   font-size: 14px; font-weight: 700;
   color: var(--brand); margin-bottom: 4px;
   display: flex; justify-content: space-between; align-items: center;
 }
-.bayes-sub { font-size: 10px; color: var(--muted); margin-bottom: 16px; }
+.bayes-sub { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
 .bayes-section { margin-bottom: 14px; }
 .bayes-section-title {
   font-size: 9px; font-weight: 700; letter-spacing: .1em;
@@ -1427,4 +1439,152 @@ body.presentation-mode .presentation-exit { display: block; }
   background: rgba(239, 68, 68, 0.1);
   border-left: 3px solid var(--danger);
   color: #fca5a5;
+}
+
+/* FEAT-08: Exportación Bayesiana Tabular (CSV, XLSX, TSV) */
+.bayes-export-toolbar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bayes-view-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bayes-pill {
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+  user-select: none;
+}
+.bayes-pill:hover {
+  border-color: var(--brand);
+  color: var(--text);
+}
+.bayes-pill.active {
+  background: rgba(0, 212, 170, 0.15);
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+.bayes-export-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.bayes-btn.success {
+  background: #10b981;
+  border-color: #10b981;
+  color: #0b1d16;
+  font-weight: 700;
+}
+.bayes-btn.success:hover {
+  background: #059669;
+  border-color: #059669;
+}
+.bayes-export-feedback {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: none;
+}
+.bayes-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Adaptabilidad Responsiva para Modal Bayesiano (BUG-UI-04 & BUG-UI-05) */
+.bayes-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .bayes-modal {
+    padding: 14px;
+    width: 96vw;
+    max-height: 94vh;
+  }
+  .bayes-header-sticky {
+    top: -14px;
+    padding: 12px 14px 8px 14px;
+    margin: -14px -14px 12px -14px;
+  }
+  .bayes-title {
+    font-size: 13px;
+  }
+  .bayes-sub {
+    font-size: 9px;
+    line-height: 1.3;
+  }
+  .bayes-export-toolbar {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .bayes-view-pills {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 4px;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .bayes-pill {
+    font-size: 9.5px;
+    padding: 3px 8px;
+    flex-shrink: 0;
+  }
+  .bayes-export-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .bayes-action-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+  .bayes-action-btns #btn-bayes-xlsx {
+    grid-column: span 2;
+  }
+  .bayes-btn {
+    text-align: center;
+    padding: 7px 10px;
+    font-size: 10.5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bayes-modal {
+    padding: 10px;
+  }
+  .bayes-header-sticky {
+    top: -10px;
+    padding: 10px 10px 6px 10px;
+    margin: -10px -10px 10px -10px;
+  }
 }

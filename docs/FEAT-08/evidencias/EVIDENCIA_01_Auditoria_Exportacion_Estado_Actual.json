@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-11-12T02:47:55.606Z",
+  "inspeccionCodigo": {
+    "tieneExportacionCSV": false,
+    "tieneExportacionXLSX": false,
+    "tieneCopiadoBayesiano": false,
+    "tieneSheetJS": false,
+    "tieneXMLSpreadsheet": false,
+    "tieneDescargaBlob": true,
+    "motorBayesEngineDisponible": true
+  },
+  "disponibilidadMatrices": {
+    "sistemaResuelto": true,
+    "matriz1_Priori": {
+      "disponible": true,
+      "numFilas": 2,
+      "campos": [
+        "Estado",
+        "Probabilidad a priori"
+      ],
+      "sumaTotal": 1
+    },
+    "matriz2_Verosimilitudes": {
+      "disponible": true,
+      "numFilas": 2,
+      "numColumnas": 2,
+      "sumasCondicionalesPorColumna": [
+        1,
+        1
+      ]
+    },
+    "matriz3_Conjuntas": {
+      "disponible": true,
+      "numFilas": 2,
+      "numColumnas": 2,
+      "sumaTotalConjunta": 1
+    },
+    "matriz4_Marginales": {
+      "disponible": true,
+      "numElementos": 2,
+      "sumaTotalMarginal": 1
+    },
+    "matriz5_Posteriori": {
+      "disponible": true,
+      "numEvidencias": 2,
+      "todasDefinidas": true,
+      "sumasPosteriores": [
+        1,
+        1
+      ]
+    }
+  },
+  "capacidadesCopiado": {},
+  "capacidadesDescarga": {},
+  "evaluacionAlternativasXLSX": {
+    "opcionA_SheetJS": {
+      "disponibleEnRepo": false,
+      "pesoAprox": "800 KB - 1.2 MB",
+      "pros": "API estándar de la industria, soporte completo .xlsx binario.",
+      "contras": "Requiere inyectar archivo externo o CDN; proyecto actual tiene 0 dependencias externas."
+    },
+    "opcionB_XMLSpreadsheet2003": {
+      "disponibleEnRepo": true,
+      "pesoAprox": "0 KB (código nativo puro ~3 KB)",
+      "pros": "100% nativo sin dependencias, compatible con Excel y LibreOffice con doble clic, múltiples hojas, tipos de celda estrictos (Number, String).",
+      "contras": "Extensión .xml o .xls (en lugar de .xlsx estricto); Excel 365 muestra aviso de advertencia si se fuerza nombre .xlsx."
+    },
+    "opcionC_OpenXML_Zip_Nativo": {
+      "disponibleEnRepo": true,
+      "pesoAprox": "0 KB (código nativo puro ~6 KB)",
+      "pros": "Genera archivo binario .xlsx legítimo con estructura PKZip y OpenXML, 5 hojas nativas, 0 dependencias, abre directo en Excel 2007-365 sin ninguna advertencia.",
+      "contras": "Requiere empaquetador ZIP ligero en JS."
+    }
+  },
+  "analisisRiesgosCSV": {
+    "riesgoInyeccionFormulas": "Celdas que comienzan con =, +, -, @ pueden ejecutarse como fórmulas en Excel. Mitigación: prefijar con comilla simple si el campo es texto no numérico.",
+    "riesgoSeparadorDecimal": "En sistemas en español, la coma se usa como decimal y el punto y coma como separador de columnas. Mitigación: separador configurable (coma \",\" o punto y coma \";\").",
+    "riesgoCodificacionExcel": "Excel en Windows a menudo abre CSVs UTF-8 como ANSI si carece de BOM. Mitigación: anteponer BOM UTF-8 (\\uFEFF) para garantizar visualización perfecta de caracteres especiales (tildes, eñes, θ, etc.)."
+  }
+}

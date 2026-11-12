@@ -385,14 +385,16 @@
 <!-- MODAL CALCULADORA BAYESIANA -->
 <div class="bayes-overlay" id="bayes-overlay">
   <div class="bayes-modal">
-    <div class="bayes-title">
-      𝑃 Calculadora Bayesiana
-      <button class="sens-close" onclick="closeBayes()">✕</button>
+    <div class="bayes-header-sticky">
+      <div class="bayes-title">
+        <span>𝑃 Calculadora Bayesiana</span>
+        <button class="sens-close" onclick="closeBayes()" title="Cerrar modal (Esc)">✕</button>
+      </div>
+      <div class="bayes-sub">Teorema de Bayes (Información Imperfecta de Eppen) — P(θᵢ | zⱼ) = P(θᵢ) · P(zⱼ | θᵢ) / P(zⱼ)</div>
     </div>
-    <div class="bayes-sub">Teorema de Bayes — P(Hᵢ|E) = P(E|Hᵢ)·P(Hᵢ) / P(E)</div>
 
     <div class="bayes-section">
-      <div class="bayes-section-title">Hipótesis y probabilidades a priori</div>
+      <div class="bayes-section-title">1. Estados de la Naturaleza e Hipótesis a Priori P(θᵢ)</div>
       <div id="bayes-hyp-list"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="bayes-btn" onclick="bayesAddHyp()">+ Hipótesis</button>
@@ -402,7 +404,7 @@
     </div>
 
     <div class="bayes-section">
-      <div class="bayes-section-title">Evidencia y verosimilitudes P(E|Hᵢ)</div>
+      <div class="bayes-section-title">2. Señales Informativas y Verosimilitudes P(zⱼ | θᵢ)</div>
       <div id="bayes-ev-list"></div>
       <div style="margin-top:8px">
         <button class="bayes-btn" onclick="bayesAddEv()">+ Evidencia</button>
@@ -411,7 +413,7 @@
     </div>
 
     <div class="bayes-section" id="bayes-result-section" style="display:none">
-      <div class="bayes-section-title">Tabla completa</div>
+      <div class="bayes-section-title">3. Resultados y Matrices Bayesianas</div>
       <div id="bayes-result-container"></div>
     </div>
 
