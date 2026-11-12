@@ -1966,7 +1966,7 @@ function runBayes() {
             <option value=";">Punto y coma (;)</option>
           </select>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <div class="bayes-action-btns">
           <button class="bayes-btn" id="btn-bayes-copy" onclick="copyCurrentBayesTable()" title="Copiar matriz al portapapeles en formato TSV">
             📋 Copiar TSV
           </button>
@@ -2062,7 +2062,7 @@ function runBayes() {
           <tbody>
             ${likRows}
             <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
-              <td style="font-weight:700;padding:5px 8px;color:var(--brand)">Total Condicional</td>
+              <td style="font-weight:700;padding:5px 8px;color:var(--brand)">Total Condicional Σⱼ P(zⱼ | θᵢ) = 1.0</td>
               <td style="padding:5px 8px;color:var(--muted)">—</td>
               ${likTotals}
             </tr>

@@ -3120,32 +3120,38 @@ function renderBayesInputs() {
   if (evList) {
     const hLabels = bayesHyps.map(h => h.label).join('</th><th style="font-size:9px;color:var(--muted);padding:4px 6px;text-align:right">');
     evList.innerHTML = `
-      <table style="width:100%;border-collapse:collapse">
-        <tr>
-          <th style="font-size:9px;color:var(--muted);padding:4px 6px;text-align:left">Señal Informativa zⱼ</th>
-          <th style="font-size:9px;color:var(--muted);padding:4px 6px;text-align:right">${hLabels}</th>
-        </tr>` +
+      <div class="bayes-table-responsive" style="margin-top:6px;border:1px solid var(--border);border-radius:6px;padding:4px">
+      <table style="width:100%;border-collapse:collapse;min-width:320px">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border)">
+            <th style="font-size:9.5px;color:var(--brand);padding:5px 8px;text-align:left;min-width:180px">Señal Informativa zⱼ</th>
+            <th style="font-size:9.5px;color:var(--muted);padding:5px 8px;text-align:right">${hLabels}</th>
+          </tr>
+        </thead>
+        <tbody>` +
       bayesEvs.map((ev, ei) => `
         <tr>
-          <td style="padding:4px 6px">
+          <td style="padding:5px 8px;min-width:180px">
             <input class="bayes-label-input" value="${ev.label}" placeholder="z${ei+1}"
-              oninput="bayesEvs[${ei}].label=this.value" style="width:80px">
+              oninput="bayesEvs[${ei}].label=this.value" style="width:100%;min-width:160px;font-weight:600">
           </td>` +
           bayesHyps.map((_, hi) => `
-          <td style="padding:4px 6px;text-align:right">
+          <td style="padding:5px 8px;text-align:right;min-width:70px">
             <input class="bayes-input" type="number" min="0" max="1" step="0.01"
               value="${ev.likelihoods[hi] ?? 0.5}" placeholder="0.5"
               oninput="bayesEvs[${ei}].likelihoods[${hi}]=parseFloat(this.value)||0;if(typeof updateLikelihoodSums==='function')updateLikelihoodSums()">
           </td>`).join('') +
         `</tr>`).join('') +
-      `<tr style="border-top:1px dashed var(--border);background:rgba(255,255,255,0.01)">
-        <td style="font-size:9px;font-weight:700;color:var(--muted);padding:4px 6px">Σ P(z|θ)</td>` +
+      `<tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
+        <td style="font-size:9.5px;font-weight:700;color:var(--brand);padding:5px 8px">Σⱼ P(zⱼ | θᵢ) = 1.0</td>` +
         bayesHyps.map((_, hi) => `
         <td id="bayes-col-sum-${hi}" style="font-family:'DM Mono',monospace;font-size:10px;text-align:right;padding:4px 6px;color:var(--brand);font-weight:700">
           1.000
         </td>`).join('') +
       `</tr>
-      </table>`;
+      </tbody>
+      </table>
+      </div>`;
   }
 
   if (typeof updateLikelihoodSums === 'function') updateLikelihoodSums();
