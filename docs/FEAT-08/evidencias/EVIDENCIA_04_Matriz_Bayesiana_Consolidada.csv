@@ -1,0 +1,29 @@
+﻿# === PROBABILIDADES A PRIORI P(Θ) ===
+ID_Estado,Estado_Naturaleza,Probabilidad_Priori
+θ1,θ1 (Demanda Alta),0.6
+θ2,θ2 (Demanda Baja),0.4
+Total,—,1
+
+# === VEROSIMILITUDES P(Z|Θ) ===
+ID_Senal,Senal_Informativa,P(z|θ1 (Demanda Alta)),P(z|θ2 (Demanda Baja))
+z1,z1 (Estudio Favorable),0.8,0.3
+z2,z2 (Estudio Desfavorable),0.2,0.7
+Total Condicional,—,1,1
+
+# === MATRIZ CONJUNTA DE EPPEN P(Θ ∩ Z) ===
+ID_Estado,Estado_Naturaleza,P(θ) Priori,z1 (Estudio Favorable),z2 (Estudio Desfavorable),Total P(θ)
+θ1,θ1 (Demanda Alta),0.6,0.48,0.12,0.6
+θ2,θ2 (Demanda Baja),0.4,0.12,0.27999999999999997,0.4
+Total Marginal P(z),—,1,0.6,0.39999999999999997,1
+
+# === PROBABILIDADES MARGINALES P(Z) ===
+ID_Senal,Senal_Informativa,Probabilidad_Marginal,Estado_Observacion
+z1,z1 (Estudio Favorable),0.6,Posible
+z2,z2 (Estudio Desfavorable),0.39999999999999997,Posible
+Total,—,1,Normalizada
+
+# === PROBABILIDADES A POSTERIORI P(Θ|Z) ===
+ID_Estado,Estado_Naturaleza,P(θ|z1 (Estudio Favorable)),P(θ|z2 (Estudio Desfavorable))
+θ1,θ1 (Demanda Alta),0.8,0.3
+θ2,θ2 (Demanda Baja),0.2,0.7
+Total Posterior,—,1,1

@@ -928,7 +928,7 @@ body.presentation-mode .presentation-exit { display: block; }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
-  width: 640px;
+  width: 780px; max-width: 95vw;
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;
@@ -1427,4 +1427,78 @@ body.presentation-mode .presentation-exit { display: block; }
   background: rgba(239, 68, 68, 0.1);
   border-left: 3px solid var(--danger);
   color: #fca5a5;
+}
+
+/* FEAT-08: Exportación Bayesiana Tabular (CSV, XLSX, TSV) */
+.bayes-export-toolbar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bayes-view-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.bayes-pill {
+  padding: 4px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .15s ease;
+  user-select: none;
+}
+.bayes-pill:hover {
+  border-color: var(--brand);
+  color: var(--text);
+}
+.bayes-pill.active {
+  background: rgba(0, 212, 170, 0.15);
+  border-color: var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+}
+.bayes-export-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.bayes-btn.success {
+  background: #10b981;
+  border-color: #10b981;
+  color: #0b1d16;
+  font-weight: 700;
+}
+.bayes-btn.success:hover {
+  background: #059669;
+  border-color: #059669;
+}
+.bayes-export-feedback {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #10b981;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  display: none;
+}
+.bayes-table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }

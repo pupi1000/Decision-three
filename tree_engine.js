@@ -1442,8 +1442,472 @@ function syncBayesLikelihoodHeaders() {
   renderBayesInputs();
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  MÓDULO DE EXPORTACIÓN TABULAR BAYESIANA (FEAT-08)
+//  Soporte para CSV RFC 4180 con BOM UTF-8, TSV Portapapeles y XLSX Multilibro OOXML
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Tabla precomputada CRC-32 para empaquetado ZIP sin dependencias
+const CRC_TABLE = new Uint32Array(256);
+for (let n = 0; n < 256; n++) {
+  let c = n;
+  for (let k = 0; k < 8; k++) {
+    c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  CRC_TABLE[n] = c;
+}
+
+function crc32(buf) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
 /**
- * Ejecuta el cálculo probabilístico formal e inyecta las tablas en el modal.
+ * Empaquetador ZIP estándar (PKZip 2.0 STORE) en memoria pura.
+ * Genera archivos .zip/.xlsx válidos según especificación ISO/IEC 29500 y ECMA-376.
+ */
+class SimpleZip {
+  constructor() { this.files = []; }
+  addFile(name, content) {
+    const data = (typeof content === 'string')
+      ? new TextEncoder().encode(content)
+      : content;
+    this.files.push({ name, data, crc: crc32(data), size: data.length });
+  }
+  generate() {
+    let offset = 0;
+    const fileEntries = [];
+    for (const f of this.files) {
+      const nameBytes = new TextEncoder().encode(f.name);
+      const header = new Uint8Array(30 + nameBytes.length);
+      const view = new DataView(header.buffer);
+      view.setUint32(0, 0x04034b50, true);
+      view.setUint16(4, 20, true);
+      view.setUint16(6, 0x0800, true);
+      view.setUint16(8, 0, true);
+      view.setUint32(14, f.crc, true);
+      view.setUint32(18, f.size, true);
+      view.setUint32(22, f.size, true);
+      view.setUint16(26, nameBytes.length, true);
+      header.set(nameBytes, 30);
+      fileEntries.push({ file: f, offset, header, data: f.data, nameBytes });
+      offset += header.length + f.data.length;
+    }
+    const cdStartOffset = offset;
+    const cdEntries = [];
+    for (const fe of fileEntries) {
+      const cd = new Uint8Array(46 + fe.nameBytes.length);
+      const view = new DataView(cd.buffer);
+      view.setUint32(0, 0x02014b50, true);
+      view.setUint16(4, 20, true);
+      view.setUint16(6, 20, true);
+      view.setUint16(8, 0x0800, true);
+      view.setUint32(16, fe.file.crc, true);
+      view.setUint32(20, fe.file.size, true);
+      view.setUint32(24, fe.file.size, true);
+      view.setUint16(28, fe.nameBytes.length, true);
+      view.setUint32(42, fe.offset, true);
+      cd.set(fe.nameBytes, 46);
+      cdEntries.push(cd);
+      offset += cd.length;
+    }
+    const cdSize = offset - cdStartOffset;
+    const eocd = new Uint8Array(22);
+    const eocdView = new DataView(eocd.buffer);
+    eocdView.setUint32(0, 0x06054b50, true);
+    eocdView.setUint16(8, fileEntries.length, true);
+    eocdView.setUint16(10, fileEntries.length, true);
+    eocdView.setUint32(12, cdSize, true);
+    eocdView.setUint32(16, cdStartOffset, true);
+
+    const finalBuffer = new Uint8Array(offset + 22);
+    let p = 0;
+    for (const fe of fileEntries) {
+      finalBuffer.set(fe.header, p); p += fe.header.length;
+      finalBuffer.set(fe.data, p); p += fe.data.length;
+    }
+    for (const cd of cdEntries) {
+      finalBuffer.set(cd, p); p += cd.length;
+    }
+    finalBuffer.set(eocd, p);
+    return finalBuffer;
+  }
+}
+
+/**
+ * Gestor canónico de exportación Bayesiana tabular (FEAT-08).
+ */
+const BayesExporter = {
+  /**
+   * Extrae un dataset tabular canónico con las 5 matrices formales.
+   * @param {Object} result Objeto devuelto por BayesEngine.solveSystem()
+   * @returns {Object} Dataset estructurado con priori, verosimilitudes, conjuntas, marginales, posteriori
+   */
+  getExportDataset(result) {
+    if (!result || !result.success) return null;
+    const { hypotheses, evidences, priors, likelihoodMatrix, jointMatrix, totalJointSum, marginals, posteriorsByEvidence } = result;
+
+    return {
+      priori: {
+        id: 'priori',
+        name: 'Priori',
+        title: 'Probabilidades a Priori P(θ)',
+        headers: ['ID_Estado', 'Estado_Naturaleza', 'Probabilidad_Priori'],
+        rows: hypotheses.map((h, i) => [`θ${i+1}`, h, priors[i]]),
+        totalRow: ['Total', '—', Number(priors.reduce((a, b) => a + b, 0).toFixed(4))]
+      },
+      verosimilitudes: {
+        id: 'verosimilitudes',
+        name: 'Verosimilitudes',
+        title: 'Verosimilitudes P(z|θ)',
+        headers: ['ID_Senal', 'Senal_Informativa', ...hypotheses.map(h => `P(z|${h})`)],
+        rows: evidences.map((ev, ei) => [`z${ei+1}`, ev, ...likelihoodMatrix[ei]]),
+        totalRow: ['Total Condicional', '—', ...hypotheses.map((_, hi) => {
+          let sum = 0;
+          for (let ei = 0; ei < evidences.length; ei++) sum += likelihoodMatrix[ei][hi];
+          return Number(sum.toFixed(4));
+        })]
+      },
+      conjuntas: {
+        id: 'conjuntas',
+        name: 'Conjuntas',
+        title: 'Matriz Conjunta de Eppen P(θ ∩ z)',
+        headers: ['ID_Estado', 'Estado_Naturaleza', 'P(θ) Priori', ...evidences, 'Total P(θ)'],
+        rows: hypotheses.map((h, hi) => [`θ${hi+1}`, h, priors[hi], ...jointMatrix[hi], priors[hi]]),
+        totalRow: ['Total Marginal P(z)', '—', 1.0000, ...marginals, Number(totalJointSum.toFixed(4))]
+      },
+      marginales: {
+        id: 'marginales',
+        name: 'Marginales',
+        title: 'Probabilidades Marginales P(z)',
+        headers: ['ID_Senal', 'Senal_Informativa', 'Probabilidad_Marginal', 'Estado_Observacion'],
+        rows: evidences.map((ev, ei) => {
+          const m = marginals[ei];
+          return [`z${ei+1}`, ev, m, m > 0.0001 ? 'Posible' : 'Imposible (P=0)'];
+        }),
+        totalRow: ['Total', '—', Number(marginals.reduce((a, b) => a + b, 0).toFixed(4)), 'Normalizada']
+      },
+      posteriori: {
+        id: 'posteriori',
+        name: 'Posteriori',
+        title: 'Probabilidades a Posteriori P(θ|z)',
+        headers: ['ID_Estado', 'Estado_Naturaleza', ...evidences.map(e => `P(θ|${e})`)],
+        rows: hypotheses.map((h, hi) => {
+          const postVals = posteriorsByEvidence.map(p => p.isPossible ? p.distribution[hi] : 'Indefinida');
+          return [`θ${hi+1}`, h, ...postVals];
+        }),
+        totalRow: ['Total Posterior', '—', ...posteriorsByEvidence.map(p => p.isPossible ? Number(p.sum.toFixed(4)) : 0)]
+      }
+    };
+  },
+
+  /**
+   * Sanitiza y escapa una celda para CSV conforme a RFC 4180.
+   * Mitiga inyección de fórmulas de hoja de cálculo (=, +, -, @).
+   */
+  sanitizeCSVField(val, separator = ',') {
+    if (val === null || val === undefined) return '';
+    let s = String(val);
+    if (typeof val === 'string' && /^[=+\-@]/.test(s)) {
+      s = "'" + s;
+    }
+    if (s.includes(separator) || s.includes('"') || s.includes('\n') || s.includes('\r')) {
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  },
+
+  /**
+   * Genera archivo CSV UTF-8 con prefijo BOM (\uFEFF) para compatibilidad con Excel.
+   */
+  toCSV(tableData, separator = ',') {
+    const lines = [];
+    lines.push(tableData.headers.map(h => this.sanitizeCSVField(h, separator)).join(separator));
+    for (const r of tableData.rows) {
+      lines.push(r.map(v => this.sanitizeCSVField(v, separator)).join(separator));
+    }
+    if (tableData.totalRow) {
+      lines.push(tableData.totalRow.map(v => this.sanitizeCSVField(v, separator)).join(separator));
+    }
+    return '\uFEFF' + lines.join('\r\n');
+  },
+
+  /**
+   * Genera CSV consolidado con las 5 matrices separadas por encabezados de sección.
+   */
+  toConsolidatedCSV(dataset, separator = ',') {
+    const sections = [];
+    for (const key of ['priori', 'verosimilitudes', 'conjuntas', 'marginales', 'posteriori']) {
+      const table = dataset[key];
+      if (!table) continue;
+      sections.push(`# === ${table.title.toUpperCase()} ===`);
+      sections.push(table.headers.map(h => this.sanitizeCSVField(h, separator)).join(separator));
+      for (const r of table.rows) {
+        sections.push(r.map(v => this.sanitizeCSVField(v, separator)).join(separator));
+      }
+      if (table.totalRow) {
+        sections.push(table.totalRow.map(v => this.sanitizeCSVField(v, separator)).join(separator));
+      }
+      sections.push('');
+    }
+    return '\uFEFF' + sections.join('\r\n');
+  },
+
+  /**
+   * Genera texto con formato TSV para copiado directo al portapapeles.
+   */
+  toTSV(tableData) {
+    const lines = [];
+    lines.push(tableData.headers.join('\t'));
+    for (const r of tableData.rows) {
+      lines.push(r.map(v => (v !== null && v !== undefined) ? String(v).replace(/\t/g, ' ') : '').join('\t'));
+    }
+    if (tableData.totalRow) {
+      lines.push(tableData.totalRow.map(v => (v !== null && v !== undefined) ? String(v).replace(/\t/g, ' ') : '').join('\t'));
+    }
+    return lines.join('\r\n');
+  },
+
+  /**
+   * Genera un libro Microsoft Excel (.xlsx) multilibro legítimo con 5 hojas OOXML.
+   */
+  toXLSX(dataset) {
+    const zip = new SimpleZip();
+    const sheetKeys = Object.keys(dataset);
+
+    let ctXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">\n  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n  <Default Extension="xml" ContentType="application/xml"/>\n  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>\n  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>`;
+    for (let i = 1; i <= sheetKeys.length; i++) {
+      ctXml += `\n  <Override PartName="/xl/worksheets/sheet${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`;
+    }
+    ctXml += `\n</Types>`;
+    zip.addFile('[Content_Types].xml', ctXml);
+
+    zip.addFile('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>\n</Relationships>`);
+
+    zip.addFile('xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n  <fonts count="2">\n    <font><name val="Calibri"/><sz val="11"/></font>\n    <font><b/><name val="Calibri"/><sz val="11"/></font>\n  </fonts>\n  <fills count="2">\n    <fill><patternFill patternType="none"/></fill>\n    <fill><patternFill patternType="gray125"/></fill>\n  </fills>\n  <borders count="1"><border><left/><right/><top/><bottom/></border></borders>\n  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>\n  <cellXfs count="2">\n    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>\n    <xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>\n  </cellXfs>\n  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>\n</styleSheet>`);
+
+    let wbXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">\n  <sheets>`;
+    let wbRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">\n  <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>`;
+
+    sheetKeys.forEach((key, idx) => {
+      const sheetId = idx + 1;
+      const s = dataset[key];
+      wbXml += `\n    <sheet name="${s.name}" sheetId="${sheetId}" r:id="rIdSheet${sheetId}"/>`;
+      wbRelsXml += `\n  <Relationship Id="rIdSheet${sheetId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${sheetId}.xml"/>`;
+    });
+    wbXml += `\n  </sheets>\n</workbook>`;
+    wbRelsXml += `\n</Relationships>`;
+
+    zip.addFile('xl/workbook.xml', wbXml);
+    zip.addFile('xl/_rels/workbook.xml.rels', wbRelsXml);
+
+    sheetKeys.forEach((key, idx) => {
+      const sheetId = idx + 1;
+      const s = dataset[key];
+      let wsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">\n  <sheetData>`;
+
+      let rowNum = 1;
+      wsXml += `\n    <row r="${rowNum}">`;
+      s.headers.forEach((h, colIdx) => {
+        const colLetter = String.fromCharCode(65 + colIdx);
+        const cleanH = String(h).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        wsXml += `<c r="${colLetter}${rowNum}" t="inlineStr" s="1"><is><t>${cleanH}</t></is></c>`;
+      });
+      wsXml += `</row>`;
+      rowNum++;
+
+      s.rows.forEach(r => {
+        wsXml += `\n    <row r="${rowNum}">`;
+        r.forEach((val, colIdx) => {
+          const colLetter = String.fromCharCode(65 + colIdx);
+          if (typeof val === 'number') {
+            wsXml += `<c r="${colLetter}${rowNum}" t="n"><v>${val}</v></c>`;
+          } else {
+            const cleanV = String(val ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            wsXml += `<c r="${colLetter}${rowNum}" t="inlineStr"><is><t>${cleanV}</t></is></c>`;
+          }
+        });
+        wsXml += `</row>`;
+        rowNum++;
+      });
+
+      if (s.totalRow) {
+        wsXml += `\n    <row r="${rowNum}">`;
+        s.totalRow.forEach((val, colIdx) => {
+          const colLetter = String.fromCharCode(65 + colIdx);
+          if (typeof val === 'number') {
+            wsXml += `<c r="${colLetter}${rowNum}" t="n" s="1"><v>${val}</v></c>`;
+          } else {
+            const cleanV = String(val ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            wsXml += `<c r="${colLetter}${rowNum}" t="inlineStr" s="1"><is><t>${cleanV}</t></is></c>`;
+          }
+        });
+        wsXml += `</row>`;
+      }
+
+      wsXml += `\n  </sheetData>\n</worksheet>`;
+      zip.addFile(`xl/worksheets/sheet${sheetId}.xml`, wsXml);
+    });
+
+    return zip.generate();
+  },
+
+  /**
+   * Provoca la descarga en el navegador de un Blob binario.
+   */
+  downloadBlob(blob, filename) {
+    if (typeof window === 'undefined' || !window.document) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+};
+
+// Variables de estado del módulo Bayesiano en memoria
+let activeBayesTab = 'all';
+let currentBayesResult = null;
+let currentBayesDataset = null;
+
+/**
+ * Alterna la vista activa entre todas las matrices o una individual.
+ */
+function switchBayesView(tabId) {
+  activeBayesTab = tabId;
+  if (typeof window !== 'undefined') {
+    window.activeBayesTab = activeBayesTab;
+  }
+  const pills = document.querySelectorAll('.bayes-pill');
+  pills.forEach(p => {
+    if (p.getAttribute('data-tab') === tabId) {
+      p.classList.add('active');
+    } else {
+      p.classList.remove('active');
+    }
+  });
+
+  const sections = ['priori', 'verosimilitudes', 'conjuntas', 'marginales', 'posteriori'];
+  sections.forEach(sec => {
+    const el = document.getElementById(`bayes-sec-${sec}`);
+    if (el) {
+      el.style.display = (tabId === 'all' || tabId === sec) ? 'block' : 'none';
+    }
+  });
+}
+
+/**
+ * Descarga la matriz actualmente seleccionada en formato CSV.
+ */
+function downloadCurrentBayesCSV() {
+  if (!currentBayesDataset) return;
+  const sepSelect = document.getElementById('bayes-csv-sep');
+  const separator = sepSelect ? sepSelect.value : ',';
+  const nowStr = new Date().toISOString().slice(0, 10);
+
+  if (activeBayesTab === 'all') {
+    const csvContent = BayesExporter.toConsolidatedCSV(currentBayesDataset, separator);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    BayesExporter.downloadBlob(blob, `Matriz_Bayesiana_Completa_${nowStr}.csv`);
+    showBayesExportFeedback('✓ Archivo CSV consolidado descargado');
+  } else {
+    const tableData = currentBayesDataset[activeBayesTab];
+    if (!tableData) return;
+    const csvContent = BayesExporter.toCSV(tableData, separator);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    BayesExporter.downloadBlob(blob, `Bayes_${tableData.name}_${nowStr}.csv`);
+    showBayesExportFeedback(`✓ Archivo CSV de ${tableData.name} descargado`);
+  }
+}
+
+/**
+ * Descarga el libro Excel (.xlsx) con las 5 hojas.
+ */
+function downloadBayesXLSX() {
+  if (!currentBayesDataset) return;
+  const xlsxBytes = BayesExporter.toXLSX(currentBayesDataset);
+  const blob = new Blob([xlsxBytes], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+  const nowStr = new Date().toISOString().slice(0, 10);
+  BayesExporter.downloadBlob(blob, `Matriz_Bayesiana_Completa_${nowStr}.xlsx`);
+  showBayesExportFeedback('✓ Libro Excel (.xlsx) con 5 hojas generado y descargado');
+}
+
+/**
+ * Copia la tabla activa al portapapeles en formato TSV.
+ */
+function copyCurrentBayesTable() {
+  if (!currentBayesDataset) return;
+  let text = '';
+  if (activeBayesTab === 'all') {
+    const parts = [];
+    for (const key of ['priori', 'verosimilitudes', 'conjuntas', 'marginales', 'posteriori']) {
+      const table = currentBayesDataset[key];
+      if (table) {
+        parts.push(`=== ${table.title.toUpperCase()} ===`);
+        parts.push(BayesExporter.toTSV(table));
+        parts.push('');
+      }
+    }
+    text = parts.join('\r\n');
+  } else {
+    const tableData = currentBayesDataset[activeBayesTab];
+    if (!tableData) return;
+    text = BayesExporter.toTSV(tableData);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      showBayesExportFeedback('✓ Datos copiados al portapapeles en formato TSV (listo para Excel)');
+    }).catch(() => {
+      fallbackCopyText(text);
+    });
+  } else {
+    fallbackCopyText(text);
+  }
+}
+
+function fallbackCopyText(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showBayesExportFeedback('✓ Datos copiados al portapapeles en formato TSV');
+  } catch (e) {
+    alert('No se pudo copiar automáticamente.');
+  }
+  document.body.removeChild(ta);
+}
+
+function showBayesExportFeedback(msg) {
+  const el = document.getElementById('bayes-export-msg');
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(() => {
+      if (el) el.style.display = 'none';
+    }, 4000);
+  }
+  if (typeof setStatus === 'function') {
+    setStatus(msg);
+  }
+}
+
+/**
+ * Ejecuta el cálculo probabilístico formal e inyecta las 5 tablas y la barra de exportación (FEAT-07 & FEAT-08).
  */
 function runBayes() {
   const warn = document.getElementById('bayes-warn');
@@ -1467,9 +1931,147 @@ function runBayes() {
   const container = document.getElementById('bayes-result-container');
   if (!container) return;
 
-  const { hypotheses, evidences, priors, jointMatrix, totalJointSum, marginals, totalMarginalSum, posteriorsByEvidence } = result;
+  currentBayesResult = result;
+  currentBayesDataset = BayesExporter.getExportDataset(result);
+  activeBayesTab = 'all';
+  if (typeof window !== 'undefined') {
+    window.currentBayesResult = currentBayesResult;
+    window.currentBayesDataset = currentBayesDataset;
+    window.activeBayesTab = activeBayesTab;
+  }
 
-  // ── 1. MATRIZ DE EPPEN: PROBABILIDADES CONJUNTAS Y MARGINALES ──
+  const { hypotheses, evidences, priors, likelihoodMatrix, jointMatrix, totalJointSum, marginals, posteriorsByEvidence } = result;
+
+  // ── BARRA DE HERRAMIENTAS DE EXPORTACIÓN (FEAT-08) ──
+  const toolbarHtml = `
+    <div class="bayes-export-toolbar">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.06em">
+          Vistas de Matrices Bayesianas (FEAT-08)
+        </div>
+        <div class="bayes-view-pills">
+          <button class="bayes-pill active" data-tab="all" onclick="switchBayesView('all')">Todas las Matrices</button>
+          <button class="bayes-pill" data-tab="priori" onclick="switchBayesView('priori')">1. A Priori</button>
+          <button class="bayes-pill" data-tab="verosimilitudes" onclick="switchBayesView('verosimilitudes')">2. Verosimilitudes</button>
+          <button class="bayes-pill" data-tab="conjuntas" onclick="switchBayesView('conjuntas')">3. Conjuntas (Eppen)</button>
+          <button class="bayes-pill" data-tab="marginales" onclick="switchBayesView('marginales')">4. Marginales</button>
+          <button class="bayes-pill" data-tab="posteriori" onclick="switchBayesView('posteriori')">5. A Posteriori</button>
+        </div>
+      </div>
+      <div class="bayes-export-actions">
+        <div style="display:flex;align-items:center;gap:6px">
+          <label for="bayes-csv-sep" style="font-size:10px;color:var(--muted);font-weight:600">Separador CSV:</label>
+          <select id="bayes-csv-sep" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:10px;outline:none">
+            <option value="," selected>Coma (,)</option>
+            <option value=";">Punto y coma (;)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <button class="bayes-btn" id="btn-bayes-copy" onclick="copyCurrentBayesTable()" title="Copiar matriz al portapapeles en formato TSV">
+            📋 Copiar TSV
+          </button>
+          <button class="bayes-btn" id="btn-bayes-csv" onclick="downloadCurrentBayesCSV()" title="Descargar matriz en formato CSV UTF-8 con BOM">
+            📄 Descargar CSV
+          </button>
+          <button class="bayes-btn primary" id="btn-bayes-xlsx" onclick="downloadBayesXLSX()" title="Descargar libro Excel completo con las 5 matrices en hojas separadas">
+            📊 Descargar Excel (.xlsx)
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="bayes-export-msg" class="bayes-export-feedback"></div>
+  `;
+
+  // ── SECCIÓN 1: PROBABILIDADES A PRIORI ──
+  const prioriRows = hypotheses.map((h, i) => `
+    <tr>
+      <td style="font-weight:600;padding:5px 8px;font-family:'DM Mono',monospace;color:var(--muted)">θ${i+1}</td>
+      <td style="font-weight:600;padding:5px 8px">${h}</td>
+      <td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace;font-weight:700;color:var(--brand)">${priors[i].toFixed(4)}</td>
+    </tr>
+  `).join('');
+
+  const prioriHtml = `
+    <div id="bayes-sec-priori" class="bayes-table-wrapper" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em">
+          1. Probabilidades a Priori P(θᵢ)
+        </div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700">
+          Σ P(θ) = ${priors.reduce((a,b)=>a+b,0).toFixed(4)} (Normalizada)
+        </span>
+      </div>
+      <div class="bayes-table-responsive">
+        <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:5px 8px">ID</th>
+              <th style="text-align:left;padding:5px 8px">Estado de la Naturaleza (θᵢ)</th>
+              <th style="text-align:right;padding:5px 8px">Probabilidad a Priori P(θᵢ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${prioriRows}
+            <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
+              <td style="font-weight:700;padding:5px 8px;color:var(--brand)">Total</td>
+              <td style="padding:5px 8px;color:var(--muted)">—</td>
+              <td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace;font-weight:800;color:#10b981">
+                ${priors.reduce((a,b)=>a+b,0).toFixed(4)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // ── SECCIÓN 2: VEROSIMILITUDES ──
+  const likHeaders = hypotheses.map(h => `<th style="text-align:right;padding:5px 8px">P(zⱼ | ${h})</th>`).join('');
+  const likRows = evidences.map((ev, ei) => `
+    <tr>
+      <td style="font-weight:600;padding:5px 8px;font-family:'DM Mono',monospace;color:var(--muted)">z${ei+1}</td>
+      <td style="font-weight:600;padding:5px 8px">${ev}</td>
+      ${likelihoodMatrix[ei].map(l => `<td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace">${l.toFixed(4)}</td>`).join('')}
+    </tr>
+  `).join('');
+
+  const likTotals = hypotheses.map((_, hi) => {
+    let sum = 0;
+    for (let ei = 0; ei < evidences.length; ei++) sum += likelihoodMatrix[ei][hi];
+    return `<td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace;font-weight:800;color:#10b981">${sum.toFixed(4)}</td>`;
+  }).join('');
+
+  const verosimilitudesHtml = `
+    <div id="bayes-sec-verosimilitudes" class="bayes-table-wrapper" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em">
+          2. Matriz de Verosimilitudes P(zⱼ | θᵢ)
+        </div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700">
+          Σ Verosimilitudes = 1.0000 por Estado
+        </span>
+      </div>
+      <div class="bayes-table-responsive">
+        <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:5px 8px">ID</th>
+              <th style="text-align:left;padding:5px 8px">Señal Informativa (zⱼ)</th>
+              ${likHeaders}
+            </tr>
+          </thead>
+          <tbody>
+            ${likRows}
+            <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
+              <td style="font-weight:700;padding:5px 8px;color:var(--brand)">Total Condicional</td>
+              <td style="padding:5px 8px;color:var(--muted)">—</td>
+              ${likTotals}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  // ── SECCIÓN 3: MATRIZ DE EPPEN (CONJUNTAS Y MARGINALES) ──
   const eppenHeaders = evidences.map(e => `<th style="text-align:right;padding:6px 8px">${e}</th>`).join('');
   let eppenRows = '';
 
@@ -1487,46 +2089,102 @@ function runBayes() {
   const marginalCols = marginals.map(m => `<td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-weight:700;color:var(--brand)">${m.toFixed(4)}</td>`).join('');
 
   const eppenTableHtml = `
-    <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px">
+    <div id="bayes-sec-conjuntas" class="bayes-table-wrapper" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
         <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em">
-          Matriz de Información Imperfecta de Eppen (Conjuntas y Marginales)
+          3. Matriz de Información Imperfecta de Eppen (Conjuntas P(θ ∩ z))
         </div>
         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700">
           ΣΣ Conjuntas = ${totalJointSum.toFixed(4)} (AC-01 OK)
         </span>
       </div>
-      <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead>
-          <tr style="border-bottom:1px solid var(--border)">
-            <th style="text-align:left;padding:6px 8px">Estado θᵢ</th>
-            <th style="text-align:right;padding:6px 8px">P(θᵢ) a priori</th>
-            ${eppenHeaders}
-            <th style="text-align:right;padding:6px 8px;color:var(--gold)">Total P(θᵢ)</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${eppenRows}
-          <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
-            <td style="font-weight:700;padding:6px 8px;color:var(--brand)">Total Marginal P(zⱼ)</td>
-            <td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;color:var(--muted)">1.0000</td>
-            ${marginalCols}
-            <td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-weight:800;color:#10b981;font-size:12px">
-              ${totalJointSum.toFixed(4)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="bayes-table-responsive">
+        <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:6px 8px">Estado θᵢ</th>
+              <th style="text-align:right;padding:6px 8px">P(θᵢ) a priori</th>
+              ${eppenHeaders}
+              <th style="text-align:right;padding:6px 8px;color:var(--gold)">Total P(θᵢ)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${eppenRows}
+            <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
+              <td style="font-weight:700;padding:6px 8px;color:var(--brand)">Total Marginal P(zⱼ)</td>
+              <td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;color:var(--muted)">1.0000</td>
+              ${marginalCols}
+              <td style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-weight:800;color:#10b981;font-size:12px">
+                ${totalJointSum.toFixed(4)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div style="font-size:9.5px;color:var(--muted);margin-top:6px">
-        Fórmula: P(θᵢ ∩ zⱼ) = P(θᵢ) × P(zⱼ|θᵢ) &nbsp;|&nbsp; Marginales: P(zⱼ) = Σᵢ P(θᵢ ∩ zⱼ) (AC-02 OK)
+        Fórmula: P(θᵢ ∩ zⱼ) = P(θᵢ) × P(zⱼ|θᵢ) &nbsp;|&nbsp; Marginales: P(zⱼ) = Σᵢ P(θᵢ ∩ zⱼ)
       </div>
     </div>`;
 
-  // ── 2. DISTRIBUCIONES POSTERIORES POR SEÑAL (AC-03) ──
-  let posteriorsHtml = `
-    <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
-      Distribuciones de Probabilidad a Posteriori P(θᵢ | zⱼ)
+  // ── SECCIÓN 4: PROBABILIDADES MARGINALES ──
+  const marginalRows = evidences.map((ev, ei) => {
+    const m = marginals[ei];
+    const isPos = m > 0.0001;
+    return `
+      <tr>
+        <td style="font-weight:600;padding:5px 8px;font-family:'DM Mono',monospace;color:var(--muted)">z${ei+1}</td>
+        <td style="font-weight:600;padding:5px 8px">${ev}</td>
+        <td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace;font-weight:700;color:var(--brand)">${m.toFixed(4)}</td>
+        <td style="text-align:center;padding:5px 8px">
+          <span style="font-size:10px;padding:2px 6px;border-radius:8px;background:${isPos ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};color:${isPos ? '#10b981' : '#ef4444'};font-weight:600">
+            ${isPos ? 'Posible (P > 0)' : 'Imposible (P = 0)'}
+          </span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const marginalesHtml = `
+    <div id="bayes-sec-marginales" class="bayes-table-wrapper" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em">
+          4. Probabilidades Marginales de las Señales P(zⱼ)
+        </div>
+        <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:700">
+          Σ P(z) = ${marginals.reduce((a,b)=>a+b,0).toFixed(4)} (Normalizada)
+        </span>
+      </div>
+      <div class="bayes-table-responsive">
+        <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:11px">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:5px 8px">ID</th>
+              <th style="text-align:left;padding:5px 8px">Señal Informativa (zⱼ)</th>
+              <th style="text-align:right;padding:5px 8px">Probabilidad Marginal P(zⱼ)</th>
+              <th style="text-align:center;padding:5px 8px">Estado / Viabilidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${marginalRows}
+            <tr style="border-top:2px solid var(--border);background:rgba(255,255,255,0.02)">
+              <td style="font-weight:700;padding:5px 8px;color:var(--brand)">Total</td>
+              <td style="padding:5px 8px;color:var(--muted)">—</td>
+              <td style="text-align:right;padding:5px 8px;font-family:'DM Mono',monospace;font-weight:800;color:#10b981">
+                ${marginals.reduce((a,b)=>a+b,0).toFixed(4)}
+              </td>
+              <td style="text-align:center;font-weight:700;color:#10b981;padding:5px 8px">Normalizada</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>`;
+
+  // ── SECCIÓN 5: DISTRIBUCIONES A POSTERIORI ──
+  let posteriorsHtml = `
+    <div id="bayes-sec-posteriori" class="bayes-table-wrapper" style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+        5. Distribuciones de Probabilidad a Posteriori P(θᵢ | zⱼ)
+      </div>`;
 
   posteriorsByEvidence.forEach((post, ei) => {
     const evLabel = evidences[ei];
@@ -1558,27 +2216,29 @@ function runBayes() {
             ${post.isPossible ? 'Normalizada: Σ = 1.0000 (AC-03 OK)' : 'Evento Imposible (P(z)=0)'}
           </span>
         </div>
-        <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:10.5px">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border)">
-              <th style="text-align:left;padding:4px 6px">Estado θᵢ</th>
-              <th style="text-align:right;padding:4px 6px">P(θᵢ)</th>
-              <th style="text-align:right;padding:4px 6px">P(${evLabel}|θᵢ)</th>
-              <th style="text-align:right;padding:4px 6px">P(θᵢ ∩ ${evLabel})</th>
-              <th style="text-align:right;padding:4px 6px;color:var(--brand)">P(θᵢ|${evLabel})</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows}
-            <tr style="border-top:1px solid var(--border);font-weight:700">
-              <td style="padding:4px 6px">Total</td>
-              <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace">1.0000</td>
-              <td style="text-align:right;padding:4px 6px">—</td>
-              <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace">${post.marginal.toFixed(4)}</td>
-              <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;color:var(--brand)">${postSumDisplay}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="bayes-table-responsive">
+          <table class="bayes-result-table" style="width:100%;border-collapse:collapse;font-size:10.5px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border)">
+                <th style="text-align:left;padding:4px 6px">Estado θᵢ</th>
+                <th style="text-align:right;padding:4px 6px">P(θᵢ)</th>
+                <th style="text-align:right;padding:4px 6px">P(${evLabel}|θᵢ)</th>
+                <th style="text-align:right;padding:4px 6px">P(θᵢ ∩ ${evLabel})</th>
+                <th style="text-align:right;padding:4px 6px;color:var(--brand)">P(θᵢ|${evLabel})</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+              <tr style="border-top:1px solid var(--border);font-weight:700">
+                <td style="padding:4px 6px">Total</td>
+                <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace">1.0000</td>
+                <td style="text-align:right;padding:4px 6px">—</td>
+                <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace">${post.marginal.toFixed(4)}</td>
+                <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;color:var(--brand)">${postSumDisplay}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
         <div style="display:flex;justify-content:flex-end;margin-top:8px">
           <button class="bayes-btn" style="font-size:10.5px;padding:4px 10px;background:var(--surface3);color:var(--brand);border:1px solid var(--border-hi)" onclick="applyBayesToSelectedNode(${ei})">
             ⚡ Aplicar posterior de ${evLabel} al nodo de azar seleccionado
@@ -1586,20 +2246,22 @@ function runBayes() {
         </div>
       </div>`;
   });
+  posteriorsHtml += `</div>`;
 
-  container.innerHTML = eppenTableHtml + posteriorsHtml;
+  container.innerHTML = toolbarHtml + prioriHtml + verosimilitudesHtml + eppenTableHtml + marginalesHtml + posteriorsHtml;
 
   const resSection = document.getElementById('bayes-result-section');
   if (resSection) resSection.style.display = 'block';
 
   container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   if (typeof setStatus === 'function') {
-    setStatus('Calculadora Bayesiana (Eppen) — Flujo probabilístico calculado y normalizado con éxito');
+    setStatus('Calculadora Bayesiana (Eppen) — Flujo probabilístico calculado y listo para exportar');
   }
 }
 
 if (typeof window !== 'undefined') {
   window.BayesEngine = BayesEngine;
+  window.BayesExporter = BayesExporter;
   window.runBayes = runBayes;
   window.bayesAddHyp = bayesAddHyp;
   window.bayesRemoveHyp = bayesRemoveHyp;
@@ -1607,6 +2269,13 @@ if (typeof window !== 'undefined') {
   window.bayesRemoveEv = bayesRemoveEv;
   window.updatePriorSum = updatePriorSum;
   window.updateLikelihoodSums = updateLikelihoodSums;
+  window.switchBayesView = switchBayesView;
+  window.downloadCurrentBayesCSV = downloadCurrentBayesCSV;
+  window.downloadBayesXLSX = downloadBayesXLSX;
+  window.copyCurrentBayesTable = copyCurrentBayesTable;
+  window.showBayesExportFeedback = showBayesExportFeedback;
+  window.getCurrentBayesDataset = () => currentBayesDataset;
+  window.getActiveBayesTab = () => activeBayesTab;
 }
 
 

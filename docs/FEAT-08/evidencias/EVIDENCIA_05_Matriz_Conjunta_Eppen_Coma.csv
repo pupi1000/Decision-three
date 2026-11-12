@@ -1,0 +1,4 @@
+﻿ID_Estado,Estado_Naturaleza,P(θ) Priori,z1 (Estudio Favorable),z2 (Estudio Desfavorable),Total P(θ)
+θ1,θ1 (Demanda Alta),0.6,0.48,0.12,0.6
+θ2,θ2 (Demanda Baja),0.4,0.12,0.27999999999999997,0.4
+Total Marginal P(z),—,1,0.6,0.39999999999999997,1

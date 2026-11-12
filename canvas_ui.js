@@ -3084,6 +3084,8 @@ function openBayes() {
   renderBayesInputs();
   document.getElementById('bayes-overlay').classList.add('open');
   document.getElementById('bayes-result-section').style.display = 'none';
+  const msg = document.getElementById('bayes-export-msg');
+  if (msg) msg.style.display = 'none';
   const warn = document.getElementById('bayes-warn');
   if (warn) {
     warn.style.display = 'none';

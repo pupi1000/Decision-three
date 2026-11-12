@@ -1,0 +1,53 @@
+{
+  "testSuite": "FEAT-08: Validación Funcional de Exportación Bayesiana en Navegador",
+  "timestamp": "2026-11-12T02:58:01.448Z",
+  "tests": [
+    {
+      "name": "Renderizado del Modal y Barra de Exportación (FEAT-08-AC-03)",
+      "expected": "Todos los elementos presentes y visibles",
+      "actual": {
+        "modalOpen": true,
+        "resSecVisible": true,
+        "hasToolbar": true,
+        "pillsCount": 6,
+        "hasCopyBtn": true,
+        "hasCsvBtn": true,
+        "hasXlsxBtn": true,
+        "hasSepSelect": true,
+        "secPriori": true,
+        "secVero": true,
+        "secConj": true,
+        "secMarg": true,
+        "secPost": true
+      },
+      "passed": true
+    },
+    {
+      "name": "Interacción con Selector de Pestañas (FEAT-08-AC-03)",
+      "expected": "Solo la matriz seleccionada visible",
+      "actual": {
+        "activeTab": "conjuntas",
+        "conjuntasDisplay": "block",
+        "prioriDisplay": "none",
+        "verosimilitudesDisplay": "none"
+      },
+      "passed": true
+    },
+    {
+      "name": "Generación de Archivos de Descarga y Formato TSV (FEAT-08-AC-01 / AC-02)",
+      "expected": "Blobs no vacíos con tipos MIME correctos",
+      "actual": {
+        "csvCommaBlobSize": 256,
+        "csvCommaType": "text/csv;charset=utf-8;",
+        "csvSemiBlobSize": 256,
+        "xlsxBlobSize": 10761,
+        "xlsxType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "tsvString": "ID_Estado\tEstado_Naturaleza\tP(θ) Priori\tz1 (Estudio Favorable)\tz2 (Estudio Desfavorable)\tTotal P(θ)\r\nθ1\tθ1 (Demanda Alta)\t0.6\t0.48\t0.12\t0.6\r\nθ2\tθ2 (Demanda Baja)\t0.4\t0.12\t0.27999999999999997\t0.4\r\nTotal Marginal P(z)\t—\t1\t0.6\t0.39999999999999997\t1",
+        "hasTabs": true
+      },
+      "passed": true
+    }
+  ],
+  "consoleErrors": [],
+  "overallStatus": "PASSED"
+}
