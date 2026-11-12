@@ -1396,3 +1396,178 @@ function fmt(n) {
 function escXml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+
+// ═══════════════════════════════════════════════
+//  DESERIALIZACIÓN, INSERCIÓN Y GESTIÓN DE IDS (BUG-03)
+// ═══════════════════════════════════════════════
+/**
+ * Escanea recursivamente el árbol para determinar el sufijo numérico máximo de los IDs
+ * y reasignar duplicados o IDs ausentes, garantizando la unicidad estricta y sincronizando nodeCounter.
+ * @param {Object} root Nodo raíz del árbol
+ * @returns {number} Valor actualizado de nodeCounter
+ */
+function syncNodeCounterFromTree(root) {
+  let maxId = 0;
+  const seenIds = new Set();
+
+  function scan(node) {
+    if (!node) return;
+    if (node.id) {
+      const match = String(node.id).match(/^([A-Za-z]+)(\d+)$/);
+      if (match) {
+        const num = parseInt(match[2], 10);
+        if (!isNaN(num) && num > maxId) maxId = num;
+      }
+      if (seenIds.has(node.id)) {
+        // ID duplicado detectado: reasignar unívocamente
+        maxId++;
+        const prefix = node.type === 'decision' ? 'D' : node.type === 'chance' ? 'C' : 'T';
+        node.id = prefix + maxId;
+      }
+      seenIds.add(node.id);
+    } else {
+      maxId++;
+      const prefix = node.type === 'decision' ? 'D' : node.type === 'chance' ? 'C' : 'T';
+      node.id = prefix + maxId;
+      seenIds.add(node.id);
+    }
+
+    if (node.type === 'terminal') {
+      node.children = [];
+    } else {
+      node.children = Array.isArray(node.children) ? node.children : [];
+      node.children.forEach(scan);
+    }
+  }
+
+  scan(root);
+  nodeCounter = Math.max(maxId, nodeCounter || 0);
+  return nodeCounter;
+}
+
+/**
+ * Deserializa y valida una estructura de árbol desde JSON (cadena u objeto),
+ * saneando tipos, aciclicidad, propiedades de hojas y sincronizando identificadores.
+ * @param {string|Object} jsonInput Cadena JSON o estructura de objeto
+ * @returns {{tree: Object, nodeCounter: number, optimizeMode: string}}
+ */
+function loadTreeFromJSON(jsonInput) {
+  let data;
+  if (typeof jsonInput === 'string') {
+    data = JSON.parse(jsonInput);
+  } else if (typeof jsonInput === 'object' && jsonInput !== null) {
+    data = jsonInput;
+  } else {
+    throw new Error('Entrada JSON inválida');
+  }
+
+  const root = data.tree || data;
+  if (!root || !root.type) {
+    throw new Error('Formato no reconocido: raíz no encontrada');
+  }
+
+  // Limpiar propiedades volátiles internas de ejecución
+  function cleanVolatile(n) {
+    if (!n) return;
+    delete n._ev;
+    delete n._optimal;
+    delete n._isChosen;
+    delete n._layout;
+    delete n.hasProbabilityError;
+    delete n._probBadgeText;
+    delete n._probBadgeClass;
+    (n.children || []).forEach(cleanVolatile);
+  }
+  cleanVolatile(root);
+
+  const initialCounter = data.nodeCounter ? Number(data.nodeCounter) : 0;
+  if (!isNaN(initialCounter) && initialCounter > nodeCounter) {
+    nodeCounter = initialCounter;
+  }
+
+  syncNodeCounterFromTree(root);
+
+  return {
+    tree: root,
+    nodeCounter,
+    optimizeMode: data.optimizeMode || 'max'
+  };
+}
+
+/**
+ * Inserta limpiamente un nuevo nodo entre un nodo padre y un nodo hijo existente,
+ * preservando la probabilidad de rama en el padre de azar y evitando nodos puente unarios.
+ * @param {Object} root Árbol completo
+ * @param {string} targetChildId ID del nodo hijo seleccionado
+ * @param {Object} newNodeData Datos del nuevo nodo (type, label, value)
+ * @returns {Object|null} El nuevo nodo insertado
+ */
+function insertNodeBetween(root, targetChildId, newNodeData) {
+  if (!root || !targetChildId) return null;
+  const targetChild = findNode(root, targetChildId);
+  const parent = findParent(root, targetChildId);
+  if (!targetChild || !parent) return null;
+
+  nodeCounter++;
+  const type = newNodeData.type || 'chance';
+  const prefix = type === 'decision' ? 'D' : type === 'chance' ? 'C' : 'T';
+  const newId = prefix + nodeCounter;
+  const label = newNodeData.label || 'Nuevo nodo';
+  const value = newNodeData.value || 0;
+
+  // 1. Preservar probabilidad en la rama del padre si el padre es de azar (BUG-03 / BUG-DTP-004)
+  const parentBranchProb = (parent.type === 'chance' && targetChild.prob !== null && !isNaN(targetChild.prob))
+    ? Number(targetChild.prob)
+    : null;
+
+  // 2. Construir nuevo nodo
+  const newNode = {
+    id: newId,
+    type,
+    label,
+    value,
+    prob: parentBranchProb,
+    children: [targetChild]
+  };
+
+  // 3. Prevenir nodo puente unario incompleto:
+  // Todo nodo de decisión o azar intercalado requiere al menos una rama alternativa
+  if (type === 'decision') {
+    targetChild.prob = null; // En decisión los hijos no llevan probabilidad
+    nodeCounter++;
+    newNode.children.push({
+      id: 'T' + nodeCounter,
+      type: 'terminal',
+      label: 'Alternativa 2',
+      value: 0,
+      prob: null,
+      children: []
+    });
+  } else if (type === 'chance') {
+    // Si el nodo intercalado es de azar, balancear probabilidades para que sumen 1.000
+    targetChild.prob = 0.50;
+    nodeCounter++;
+    newNode.children.push({
+      id: 'T' + nodeCounter,
+      type: 'terminal',
+      label: 'E2 (p=50.0%)',
+      value: 0,
+      prob: 0.50,
+      children: []
+    });
+  }
+
+  const idx = parent.children.findIndex(c => c.id === targetChildId);
+  if (idx !== -1) {
+    parent.children[idx] = newNode;
+  }
+
+  return newNode;
+}
+
+if (typeof window !== 'undefined') {
+  window.syncNodeCounterFromTree = syncNodeCounterFromTree;
+  window.loadTreeFromJSON = loadTreeFromJSON;
+  window.insertNodeBetween = insertNodeBetween;
+}

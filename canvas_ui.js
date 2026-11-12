@@ -429,22 +429,27 @@ function ctxCopySubtree() {
   setStatus(`Subárbol "${selectedNode.label}" copiado al portapapeles (${countNodes(clipboard)} nodos)`);
 }
 
-function ctxPasteSubtree() {
-  closeContextMenu();
-  if (!clipboard || !selectedNode) return;
-  if (selectedNode.type !== 'terminal') {
-    setStatus('⚠ Solo puedes pegar en un nodo terminal');
-    return;
-  }
-  snapshot();
-  // El terminal se convierte en el tipo raíz del subárbol copiado
-  const pasted = deepCloneWithNewIds(clipboard);
-  // Reemplazar el terminal seleccionado con el subárbol pegado
-  replaceNodeInTree(tree, selectedNode.id, pasted);
-  selectedNode = null;
-  render();
-  refreshSelectedPanel();
-  setStatus(`Subárbol pegado correctamente (${countNodes(pasted)} nodos)`);
+function ctxPasteSubtree() {
+  closeContextMenu();
+  if (!clipboard || !selectedNode) return;
+  if (selectedNode.type !== 'terminal') {
+    setStatus('⚠ Solo puedes pegar en un nodo terminal');
+    return;
+  }
+  snapshot();
+  // El terminal se convierte en el tipo raíz del subárbol copiado
+  const parent = findParent(tree, selectedNode.id);
+  const pasted = deepCloneWithNewIds(clipboard);
+  // BUG-03 / BUG-DTP-005: Si el padre receptor es de azar, la raíz pegada debe adoptar la probabilidad existente
+  if (parent && parent.type === 'chance') {
+    pasted.prob = (selectedNode.prob !== undefined && selectedNode.prob !== null) ? Number(selectedNode.prob) : null;
+  }
+  // Reemplazar el terminal seleccionado con el subárbol pegado
+  replaceNodeInTree(tree, selectedNode.id, pasted);
+  selectedNode = null;
+  render();
+  refreshSelectedPanel();
+  setStatus(`Subárbol pegado correctamente (${countNodes(pasted)} nodos)`);
 }
 
 function ctxChangeTo(newType) {
@@ -524,36 +529,27 @@ function closeInsertModal() {
   document.getElementById('modal-insert').classList.remove('open');
 }
 
-function confirmInsert() {
-  if (!selectedNode || !tree) return;
-  const type  = document.getElementById('insert-type').value;
-  const label = document.getElementById('insert-label').value.trim() || 'Nuevo nodo';
-  const value = parseFloat(document.getElementById('insert-value').value) || 0;
-
-  snapshot();
-  nodeCounter++;
-  const prefix = type === 'decision' ? 'D' : 'C';
-  const newId  = prefix + nodeCounter;
-
-  // El nuevo nodo absorbe el selectedNode como único hijo
-  const newNode = {
-    id: newId, type, label, value, prob: null,
-    children: [selectedNode]
-  };
-
-  // Reemplazar selectedNode por newNode en su padre
-  const parent = findParent(tree, selectedNode.id);
-  if (parent) {
-    const idx = parent.children.findIndex(c => c.id === selectedNode.id);
-    if (idx !== -1) parent.children[idx] = newNode;
-  } else {
-    tree = newNode;
-  }
-
-  closeInsertModal();
-  render();
-  selectNodeById(newId);
-  setStatus(`Nodo "${label}" insertado entre padre y "${selectedNode.label}"`);
+function confirmInsert() {
+  if (!selectedNode || !tree) return;
+  if (selectedNode.id === tree.id) {
+    setStatus('⚠ No se puede insertar antes del nodo raíz');
+    return;
+  }
+  const type  = document.getElementById('insert-type').value;
+  const label = document.getElementById('insert-label').value.trim() || 'Nuevo nodo';
+  const value = parseFloat(document.getElementById('insert-value').value) || 0;
+
+  snapshot();
+
+  // BUG-03 / BUG-DTP-004: Inserción robusta preservando probabilidades y evitando nodos puente unarios
+  const newNode = (typeof insertNodeBetween === 'function')
+    ? insertNodeBetween(tree, selectedNode.id, { type, label, value })
+    : null;
+
+  closeInsertModal();
+  render();
+  if (newNode) selectNodeById(newNode.id);
+  setStatus(`Nodo "${label}" insertado entre padre y "${selectedNode.label}"`);
 }
 
 function ctxSetProbLabel(label) {
@@ -975,41 +971,40 @@ function saveJSON() {
   setStatus(`✓ Árbol guardado como JSON — ${countNodes(tree)} nodos`);
 }
 
-function loadJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (data.tree) {
-        tree = data.tree;
-        nodeCounter = data.nodeCounter || 99;
-        if (data.optimizeMode) {
-          optimizeMode = data.optimizeMode;
-          const btn = document.getElementById('btn-minmax');
-          btn.textContent = optimizeMode === 'min' ? '↓ Minimizar' : '↑ Maximizar';
-          optimizeMode === 'min' ? btn.classList.add('minimizing') : btn.classList.remove('minimizing');
-        }
-      } else if (data.id && data.type) {
-        tree = data;
-        nodeCounter = 99;
-      } else {
-        throw new Error('Formato no reconocido');
-      }
-      selectedNode = null;
-      history.length = 0; historyIdx = -1;
-      snapshot();
-      render();
-      setTimeout(fitToScreen, 50);
-      refreshSelectedPanel();
-      setStatus(`✓ Árbol cargado desde "${file.name}" — ${countNodes(tree)} nodos`);
-    } catch(err) {
-      setStatus(`⚠ Error al cargar: ${err.message}`);
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
+function loadJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      // BUG-03: Deserialización canónica y saneada con sincronización inteligente de identificadores
+      const result = (typeof loadTreeFromJSON === 'function')
+        ? loadTreeFromJSON(e.target.result)
+        : { tree: JSON.parse(e.target.result), nodeCounter: 0 };
+
+      tree = result.tree;
+      nodeCounter = result.nodeCounter;
+      if (result.optimizeMode) {
+        optimizeMode = result.optimizeMode;
+        const btn = document.getElementById('btn-minmax');
+        if (btn) {
+          btn.textContent = optimizeMode === 'min' ? '↓ Minimizar' : '↑ Maximizar';
+          optimizeMode === 'min' ? btn.classList.add('minimizing') : btn.classList.remove('minimizing');
+        }
+      }
+      selectedNode = null;
+      history.length = 0; historyIdx = -1;
+      snapshot();
+      render();
+      setTimeout(fitToScreen, 50);
+      refreshSelectedPanel();
+      setStatus(`✓ Árbol cargado desde "${file.name}" — ${countNodes(tree)} nodos`);
+    } catch(err) {
+      setStatus(`⚠ Error al cargar: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 function toggleUtilityMode() {
@@ -2712,4 +2707,10 @@ if (typeof window !== 'undefined') {
   window.showTheoryFrom = showTheoryFrom;
   window.returnFromValueInfo = returnFromValueInfo;
   window.updateReturnButton = updateReturnButton;
+}
+
+if (typeof window !== 'undefined') {
+  window.insertBranchNode = confirmInsert;
+  window.addNode = confirmAdd;
+  window.loadTreeFromJSON = (typeof loadTreeFromJSON === 'function') ? loadTreeFromJSON : null;
 }
