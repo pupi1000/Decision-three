@@ -928,7 +928,7 @@ body.presentation-mode .presentation-exit { display: block; }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
-  width: 540px;
+  width: 640px;
   max-width: 95vw;
   max-height: 90vh;
   overflow-y: auto;

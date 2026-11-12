@@ -1,0 +1,70 @@
+{
+  "Escenario_A": {
+    "descripcion": "Distribución bayesiana válida con dos estados y dos resultados informativos",
+    "warn": "",
+    "htmlGenerado": true,
+    "observacion": "Calcula correctamente marginales y posteriores cuando las verosimilitudes son válidas"
+  },
+  "Escenario_B": {
+    "descripcion": "Tabla conjunta cuya suma es diferente de 1.0 (liks suman 1.8 y 1.6)",
+    "detectoError": false,
+    "mensajeError": "",
+    "htmlGenerado": true,
+    "hallazgo": "DEFICIENCIA CRÍTICA: El código actual no valida que la suma global de probabilidades conjuntas sea 1.0 (FEAT-07-AC-01 no se cumple)."
+  },
+  "Escenario_C": {
+    "descripcion": "Probabilidad condicional inválida (sum(P(z_j | Theta1)) = 1.30 != 1.0)",
+    "detectoError": false,
+    "mensajeError": "",
+    "hallazgo": "DEFICIENCIA: El sistema no valida que para cada estado, sum_j P(z_j | Theta_i) = 1.0."
+  },
+  "Escenario_D": {
+    "descripcion": "Probabilidad a priori con suma != 1.0 (0.70 + 0.50 = 1.20)",
+    "detectoError": true,
+    "mensajeError": "⚠ Las probabilidades a priori suman 1.200 — deben sumar 1.000",
+    "hallazgo": "CORRECTO: Detecta que la suma a priori no es 1.000 y muestra advertencia."
+  },
+  "Escenario_E": {
+    "descripcion": "Distribución posterior y su validación",
+    "hallazgo": "El sistema calcula P(Theta|z) dividiendo conjunta / marginal, pero no valida formalmente que la suma sea 1.000 dentro de tolerancia para cada señal."
+  },
+  "Escenario_F": {
+    "descripcion": "Resultado informativo con probabilidad marginal igual a cero (P(z) = 0)",
+    "htmlGenerado": true,
+    "hallazgo": "Muestra \"0.0000 (Indef.)\" en la tabla, pero asigna ceros a las posteriores sin proveer un objeto semántico estructurado de señal imposible."
+  },
+  "Escenario_G": {
+    "descripcion": "Nodo de azar con suma de ramas = 0.80 != 1.0",
+    "valid": false,
+    "text": "Σ=0.80 ≠ 1",
+    "sum": 0.8,
+    "hallazgo": "CORRECTO: validateNodeProbabilities detecta que la suma no es 1.000 y marca error."
+  },
+  "Escenario_H": {
+    "descripcion": "Nodo de azar con probabilidades fuera de rango (-0.20 y 1.20)",
+    "valid": false,
+    "text": "Err: p ∉ [0, 1]",
+    "hasRangeError": true,
+    "hallazgo": "CORRECTO: validateNodeProbabilities detecta el error de rango [0, 1]."
+  },
+  "Escenario_I": {
+    "descripcion": "Árbol con 2 nodos de azar (uno válido y uno con suma errónea)",
+    "erroresDetectados": [
+      {
+        "id": "C2",
+        "label": "Mercado B",
+        "text": "Σ=0.90 ≠ 1",
+        "sum": 0.9
+      }
+    ],
+    "hallazgo": "CORRECTO: collectProbErrors valida cada nodo independientemente, reportando sólo C2 con error."
+  },
+  "Escenario_J": {
+    "descripcion": "Árbol importado vía loadTreeFromJSON y evaluado con calcEV",
+    "resultado": {
+      "ev": 14,
+      "rootType": "decision"
+    },
+    "hallazgo": "CORRECTO: loadTreeFromJSON purga y calcEV evalúa limpiamente."
+  }
+}
